@@ -1,0 +1,880 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Desk CRM Explainer</title>
+<style>
+  html, body { margin: 0; background: #0f1720; overflow: hidden; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+<svg id="stage" width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"
+     font-family="'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000" flood-opacity="0.42"/>
+    </filter>
+    <filter id="shs" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="curSh" x="-50%" y="-50%" width="220%" height="220%">
+      <feDropShadow dx="4" dy="7" stdDeviation="4" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="glow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+    <radialGradient id="bgGlow" cx="50%" cy="30%" r="75%">
+      <stop offset="0" stop-color="#172638"/>
+      <stop offset="0.6" stop-color="#111b26"/>
+      <stop offset="1" stop-color="#0f1720"/>
+    </radialGradient>
+    <pattern id="dots" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="20" cy="20" r="1.6" fill="#22303f"/>
+    </pattern>
+    <linearGradient id="logoG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#2fca73"/>
+    </linearGradient>
+    <linearGradient id="hotG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#ef4444"/>
+    </linearGradient>
+    <linearGradient id="blueBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="areaG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2fca73" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#2fca73" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="capBand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f1720" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0b121a" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bgGlow)"/>
+  <rect width="1920" height="1080" fill="url(#dots)" opacity="0.7"/>
+  <rect y="880" width="1920" height="200" fill="url(#capBand)"/>
+  <g id="frame"></g>
+</svg>
+<script>
+(function () {
+'use strict';
+const C = { bg:'#0f1720', s1:'#141d27', s2:'#1b2733', bd:'#2a3a4b', tx:'#e6edf3', mu:'#a0b1c5',
+  gr:'#2fca73', am:'#f59e0b', rd:'#ef4444', bl:'#3b82f6', off:'#3a4a5c', paper:'#f3f6fa', ink:'#1b2733', purple:'#a78bfa' };
+const TOTAL = 84.5;
+const FR = document.getElementById('frame');
+
+/* ---------- math ---------- */
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lin = (t, a, b) => clamp((t - a) / (b - a));
+const eio = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eout = x => 1 - Math.pow(1 - x, 3);
+const eback = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const E = (t, a, b) => eio(lin(t, a, b));
+const EO = (t, a, b) => eout(lin(t, a, b));
+const EB = (t, a, b) => { const p = lin(t, a, b); return p <= 0 ? 0 : eback(p); };
+const mix = (a, b, u) => a + (b - a) * u;
+const f = v => Math.round(v * 100) / 100;
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const fadeIO = (t, a, b, d = 0.35) => E(t, a, a + d) * (1 - E(t, b - d, b));
+
+/* ---------- svg helpers ---------- */
+const FONT = "'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+const _tw = new Map(), _twCtx = document.createElement('canvas').getContext('2d');
+function textW(str, size, w = 600) {   // rendered width in px, so pills and chips fit their labels
+  const k = `${w}|${size}|${str}`;
+  if (!_tw.has(k)) { _twCtx.font = `${w} ${size}px ${FONT}`; _tw.set(k, _twCtx.measureText(String(str)).width); }
+  return _tw.get(k);
+}
+function T(x, y, s, size, fill, o = {}) {
+  return `<text x="${f(x)}" y="${f(y)}" font-size="${size}" fill="${fill}" font-weight="${o.w || 500}" text-anchor="${o.a || 'start'}"` +
+    (o.op != null ? ` opacity="${f(clamp(o.op))}"` : '') + (o.ls ? ` letter-spacing="${o.ls}"` : '') + `>${s}</text>`;
+}
+function G(inner, o = {}) {
+  const { x = 0, y = 0, s = 1, r = 0, px = 0, py = 0 } = o;
+  const op = o.o == null ? 1 : o.o;
+  if (op <= 0.002 || !inner) return '';
+  const sx = o.sx == null ? s : o.sx, sy = o.sy == null ? s : o.sy;
+  return `<g transform="translate(${f(x + px)} ${f(y + py)}) rotate(${f(r)}) scale(${f(sx)} ${f(sy)}) translate(${f(-px)} ${f(-py)})" opacity="${f(clamp(op))}">${inner}</g>`;
+}
+function R(x, y, w, h, r, fill, ex = '') {
+  return `<rect x="${f(x)}" y="${f(y)}" width="${f(Math.max(0, w))}" height="${f(Math.max(0, h))}" rx="${r}" fill="${fill}" ${ex}/>`;
+}
+function Ci(cx, cy, r, fill, ex = '') { return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(Math.max(0, r))}" fill="${fill}" ${ex}/>`; }
+function card(x, y, w, h, ex = '') { return R(x, y, w, h, 26, C.s1, `stroke="${C.bd}" stroke-width="2" filter="url(#sh)" ${ex}`); }
+function check(cx, cy, s, color = '#fff', sw = 4) {
+  return `<path d="M${f(cx - 8 * s)} ${f(cy + 0.5 * s)} L${f(cx - 2.5 * s)} ${f(cy + 6 * s)} L${f(cx + 8.5 * s)} ${f(cy - 6 * s)}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function pathFrom(pts, u = 1) {
+  const n = pts.length - 1, fi = clamp(u) * n, i = Math.floor(fi);
+  let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
+  for (let k = 1; k <= Math.min(i, n); k++) d += ` L${f(pts[k][0])} ${f(pts[k][1])}`;
+  let head = pts[Math.min(i, n)];
+  if (i < n) {
+    const fr = fi - i, a = pts[i], b = pts[i + 1];
+    head = [mix(a[0], b[0], fr), mix(a[1], b[1], fr)];
+    d += ` L${f(head[0])} ${f(head[1])}`;
+  }
+  return { d, head };
+}
+function walk(seed, n, drift, vol) {
+  const r = rng(seed); let v = 0; const out = [0];
+  for (let i = 1; i < n; i++) { v += drift + (r() - 0.5) * vol; out.push(v); }
+  return out;
+}
+function scalePts(vals, x0, y0, w, h, lo, hi) {
+  const mn = lo == null ? Math.min(...vals) : lo, mx = hi == null ? Math.max(...vals) : hi;
+  return vals.map((v, i) => [x0 + w * i / (vals.length - 1), y0 + h - h * (v - mn) / ((mx - mn) || 1)]);
+}
+function spark(x, y, w, h, seed, u, color, sw = 4) {
+  if (u <= 0.01) return '';
+  const vals = walk(seed, 16, 0.25, 1.6);
+  const p = pathFrom(scalePts(vals, x, y, w, h), u);
+  return `<path d="${p.d}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function logo(size, drawU = 1) {
+  // brand tile with a rising line drawn by drawU; the end dot pops in as the line arrives
+  const s = size / 120, dot = clamp((drawU - 0.8) / 0.2);
+  return R(0, 0, size, size, 30 * s, 'url(#logoG)') +
+    `<path d="M${f(27 * s)} ${f(84 * s)} L${f(50 * s)} ${f(60 * s)} L${f(66 * s)} ${f(73 * s)} L${f(90 * s)} ${f(37 * s)}" fill="none" stroke="#fff" stroke-width="${f(12 * s)}" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${f(1 - drawU)}"/>` +
+    (dot > 0 ? Ci(90 * s, 37 * s, 10 * s * dot, '#fff') : '');
+}
+function wordmark(x, y, size, anchor = 'middle') {
+  return `<text x="${f(x)}" y="${f(y)}" font-size="${size}" font-weight="700" text-anchor="${anchor}" fill="${C.tx}" letter-spacing="${f(-size * 0.01)}">Desk <tspan fill="${C.bl}">CRM</tspan></text>`;
+}
+function chip(x, y, w, h, label, color, size = 24, fillOp = 0.16) {
+  return R(x, y, w, h, h / 2, color, `fill-opacity="${fillOp}"`) + T(x + w / 2, y + h / 2 + size * 0.36, label, size, color, { a: 'middle', w: 600 });
+}
+function avatar(cx, cy, r, ring) {
+  return Ci(cx, cy, r + 6, ring, 'opacity="0.25"') + Ci(cx, cy, r, C.s2, `stroke="${ring}" stroke-width="4"`) +
+    `<clipPath id="av${Math.round(cx)}${Math.round(cy)}"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r - 2)}"/></clipPath>` +
+    `<g clip-path="url(#av${Math.round(cx)}${Math.round(cy)})">` + Ci(cx, cy - r * 0.18, r * 0.32, ring) +
+    `<ellipse cx="${f(cx)}" cy="${f(cy + r * 0.62)}" rx="${f(r * 0.6)}" ry="${f(r * 0.42)}" fill="${ring}"/></g>`;
+}
+function lock(cx, cy, s, closeU) {
+  const lift = (1 - closeU) * 9 * s;
+  return `<path d="M${f(cx - 9 * s)} ${f(cy - 2 * s - lift)} V${f(cy - 10 * s - lift)} A${f(9 * s)} ${f(9 * s)} 0 0 1 ${f(cx + 9 * s)} ${f(cy - 10 * s - lift)} V${f(cy - 2 * s - lift * 0.2)}" fill="none" stroke="${C.mu}" stroke-width="${f(4 * s)}" stroke-linecap="round"/>` +
+    R(cx - 14 * s, cy - 3 * s, 28 * s, 22 * s, 6 * s, C.mu) + Ci(cx, cy + 7 * s, 3 * s, C.s1);
+}
+
+/* ---------- cursor ---------- */
+const ARROW = 'M0 0 L0 50 L13 38.5 L22.5 58 L31 54 L21.8 34.8 L38 34.8 Z';
+function curPos(keys, lt) {
+  if (lt <= keys[0][0]) return [keys[0][1], keys[0][2]];
+  for (let i = 0; i < keys.length - 1; i++) {
+    const [t0, x0, y0] = keys[i], [t1, x1, y1] = keys[i + 1];
+    if (lt < t1) {
+      const u = eio((lt - t0) / (t1 - t0)), dx = x1 - x0, dy = y1 - y0, d = Math.hypot(dx, dy);
+      const arc = Math.sin(Math.PI * u) * Math.min(d * 0.12, 110);
+      const nx = d ? -dy / d : 0, ny = d ? dx / d : 0;
+      return [x0 + dx * u + nx * arc, y0 + dy * u + ny * arc];
+    }
+  }
+  const k = keys[keys.length - 1]; return [k[1], k[2]];
+}
+function drawCursor(c) {
+  const { keys, clicks = [], lt, op = 1, trail } = c;
+  if (op <= 0.01) return '';
+  const P = c.pos || (v => curPos(keys, v));
+  const [x, y] = P(lt);
+  let s = '';
+  if (trail && lt > trail[0] && lt < trail[1]) {
+    const tf = Math.min(E(lt, trail[0], trail[0] + 0.2), 1 - E(lt, trail[1] - 0.2, trail[1]));
+    for (let k = 12; k >= 1; k--) {
+      const [px, py] = P(lt - k * 0.022);
+      s += Ci(px + 4, py + 6, 10 * (1 - k / 13), C.bl, `opacity="${f(0.35 * (1 - k / 13) * tf * op)}"`);
+    }
+  }
+  for (const tc of clicks) {
+    const u = (lt - tc) / 0.6;
+    if (u < 0 || u > 1) continue;
+    const [bx, by] = P(tc), e = eout(u);
+    s += Ci(bx, by, 8 + 46 * e, 'none', `stroke="${C.bl}" stroke-width="${f(5 * (1 - u) + 1)}" opacity="${f((1 - u) * 0.9 * op)}"`);
+    for (let k = 0; k < 8; k++) {
+      const a = k * Math.PI / 4 + Math.PI / 8, r1 = 20 + 34 * e, r2 = r1 + 18 * (1 - u) + 4;
+      s += `<line x1="${f(bx + Math.cos(a) * r1)}" y1="${f(by + Math.sin(a) * r1)}" x2="${f(bx + Math.cos(a) * r2)}" y2="${f(by + Math.sin(a) * r2)}" stroke="${k % 2 ? '#ffd166' : '#ffffff'}" stroke-width="5" stroke-linecap="round" opacity="${f((1 - u) * op)}"/>`;
+    }
+  }
+  let b = 0;
+  for (const tc of clicks) { const u = (lt - tc + 0.1) / 0.34; if (u > 0 && u < 1) b = Math.max(b, Math.sin(Math.PI * u)); }
+  const [qx] = P(lt - 1 / 30);
+  const tilt = clamp((x - qx) * 0.35, -14, 14);
+  const sx = 1.1 * (1 + 0.16 * b), sy = 1.1 * (1 - 0.22 * b);
+  s += `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(tilt)}) scale(${f(sx)} ${f(sy)})" opacity="${f(op)}"><path d="${ARROW}" fill="#ffffff" stroke="#0b1118" stroke-width="3.4" stroke-linejoin="round" filter="url(#curSh)"/></g>`;
+  return s;
+}
+
+/* ---------- caption ---------- */
+function caption(lines, lt, dur) {
+  const a = E(lt, 0.45, 1.05) * (1 - E(lt, dur - 0.75, dur - 0.25));
+  const dy = (1 - E(lt, 0.45, 1.05)) * 26;
+  let s = '';
+  const ys = lines.length === 1 ? [988] : [952, 1016];
+  lines.forEach((ln, i) => { s += T(960, ys[i] + dy, ln, 50, C.tx, { a: 'middle', w: 600, op: a }); });
+  return s;
+}
+
+/* ================= SCENES ================= */
+
+/* 1. Hook */
+function sHook(lt) {
+  let s = '';
+  const ls = EB(lt, 0.25, 0.95);
+  s += G(logo(150, E(lt, 0.7, 1.35)), { x: 885, y: 230, s: ls, px: 75, py: 75, o: E(lt, 0.25, 0.6) });
+  const wu = E(lt, 0.9, 1.7);
+  s += `<clipPath id="wmc"><rect x="${f(960 - 520 * wu)}" y="400" width="${f(1040 * wu)}" height="190"/></clipPath>`;
+  s += `<g clip-path="url(#wmc)">` + G(wordmark(960, 545, 132), { y: (1 - wu) * 34, o: wu }) + `</g>`;
+  const lu = E(lt, 2.0, 2.7);
+  s += T(960, 655 + (1 - lu) * 24, 'Every client account. One screen.', 58, C.mu, { a: 'middle', w: 500, op: lu });
+  const bu = E(lt, 2.5, 3.3);
+  s += R(960 - 140 * bu, 700, 280 * bu, 8, 4, 'url(#logoG)', `opacity="${f(bu)}"`);
+  return { svg: s };
+}
+
+/* 2. Before */
+function iconVps() {
+  return R(-78, -62, 156, 124, 20, C.s2, `stroke="${C.bd}" stroke-width="3"`) +
+    R(-58, -42, 116, 34, 9, C.bg) + R(-58, 6, 116, 34, 9, C.bg) +
+    T(-42, -16, 'VPS', 24, C.tx, { w: 700 }) + Ci(40, -25, 7, C.gr) + Ci(40, 23, 7, C.am) + R(-42, 18, 56, 10, 5, C.bd);
+}
+function iconSheet() {
+  let s = R(-62, -78, 124, 156, 16, '#15372a', `stroke="${C.gr}" stroke-width="3"`) + R(-62, -78, 124, 34, 16, C.gr, 'opacity="0.55"');
+  for (let i = 0; i < 4; i++) s += `<line x1="-62" x2="62" y1="${-14 + i * 26}" y2="${-14 + i * 26}" stroke="${C.gr}" stroke-opacity="0.5" stroke-width="2"/>`;
+  s += `<line x1="-20" x2="-20" y1="-44" y2="78" stroke="${C.gr}" stroke-opacity="0.5" stroke-width="2"/><line x1="22" x2="22" y1="-44" y2="78" stroke="${C.gr}" stroke-opacity="0.5" stroke-width="2"/>`;
+  return s;
+}
+function iconChat(color) {
+  return `<path d="M-46 38 L-62 72 L-14 40 Z" fill="${color}"/>` + R(-80, -50, 160, 96, 34, color) +
+    Ci(-30, -2, 9, '#fff') + Ci(0, -2, 9, '#fff') + Ci(30, -2, 9, '#fff');
+}
+function iconPdf() {
+  let s = `<path d="M-58 -78 H28 L62 -44 V78 H-58 Z" fill="${C.paper}"/><path d="M28 -78 V-44 H62 Z" fill="#c5cfdb"/>`;
+  for (let i = 0; i < 3; i++) s += R(-42, -48 + i * 18, 70 - i * 12, 8, 4, '#c5cfdb');
+  s += R(-42, 18, 84, 38, 8, C.rd) + T(0, 46, 'PDF', 26, '#fff', { a: 'middle', w: 700 });
+  return s;
+}
+function iconClock(lt) {
+  const a1 = lt * 220, a2 = lt * 40;
+  let s = Ci(0, 0, 68, C.s2, `stroke="${C.am}" stroke-width="6"`);
+  for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; s += Ci(Math.cos(a) * 52, Math.sin(a) * 52, 3.5, C.mu); }
+  s += `<line x1="0" y1="0" x2="${f(Math.sin(a1 * Math.PI / 180) * 46)}" y2="${f(-Math.cos(a1 * Math.PI / 180) * 46)}" stroke="${C.tx}" stroke-width="6" stroke-linecap="round"/>`;
+  s += `<line x1="0" y1="0" x2="${f(Math.sin(a2 * Math.PI / 180) * 30)}" y2="${f(-Math.cos(a2 * Math.PI / 180) * 30)}" stroke="${C.am}" stroke-width="8" stroke-linecap="round"/>`;
+  return s + Ci(0, 0, 8, C.tx);
+}
+const MESS = [
+  { k: 'vps', x: 380, y: 350, tx: 640, ty: 420 },
+  { k: 'sheet', x: 760, y: 250, tx: 860, ty: 330 },
+  { k: 'chatB', x: 1240, y: 270, tx: 1100, ty: 340 },
+  { k: 'pdf', x: 1570, y: 400, tx: 1300, ty: 420 },
+  { k: 'clock', x: 1480, y: 670, tx: 1260, ty: 600 },
+  { k: 'pdf', x: 520, y: 680, tx: 700, ty: 610 },
+  { k: 'chatG', x: 920, y: 640, tx: 960, ty: 560 },
+  { k: 'vps', x: 1150, y: 500, tx: 1080, ty: 470 },
+  { k: 'sheet', x: 280, y: 540, tx: 620, ty: 520 },
+];
+const MESS_LINKS = [[0, 1], [1, 2], [2, 3], [3, 4], [4, 6], [6, 5], [5, 8], [8, 0], [7, 2], [7, 6], [0, 7]];
+function dashboard(p, lt) {
+  // local coords 0..1120 x 0..620
+  let s = `<clipPath id="dclip"><rect width="1120" height="620" rx="26"/></clipPath>`;
+  s += R(0, 0, 1120, 620, 26, C.s1, `stroke="${C.bd}" stroke-width="2" filter="url(#sh)"`);
+  s += `<g clip-path="url(#dclip)">`;
+  s += R(0, 0, 1120, 66, 0, C.s2) + R(0, 66, 214, 554, 0, '#111922');
+  s += `<line x1="0" x2="1120" y1="66" y2="66" stroke="${C.bd}" stroke-width="2"/><line x1="214" x2="214" y1="66" y2="620" stroke="${C.bd}" stroke-width="2"/>`;
+  s += Ci(34, 33, 8, C.rd, 'opacity="0.8"') + Ci(60, 33, 8, C.am, 'opacity="0.8"') + Ci(86, 33, 8, C.gr, 'opacity="0.8"');
+  s += T(560, 43, 'Desk CRM', 26, C.mu, { a: 'middle', w: 600 });
+  const nav = ['Overview', 'Clients', 'Accounts', 'Algorithms', 'Reports'];
+  nav.forEach((n, i) => {
+    const u = E(p, 0.02 + i * 0.05, 0.25 + i * 0.05);
+    let it = '';
+    if (i === 0) it += R(14, 92 + i * 60, 186, 48, 14, C.bl, 'fill-opacity="0.2"');
+    it += R(30, 106 + i * 60, 20, 20, 6, i === 0 ? C.bl : C.bd) + T(64, 124 + i * 60, n, 24, i === 0 ? C.tx : C.mu, { w: 600 });
+    s += G(it, { x: (1 - u) * -20, o: u });
+  });
+  const kpi = [['Accounts', 'Live'], ['Daily close', 'Done'], ['Reports', 'Ready']];
+  kpi.forEach((k, i) => {
+    const u = EB(p, 0.2 + i * 0.08, 0.5 + i * 0.08);
+    const x = 244 + i * 290;
+    s += G(R(x, 92, 270, 132, 18, C.s2, `stroke="${C.bd}" stroke-width="2"`) + T(x + 24, 136, k[0], 24, C.mu, { w: 600 }) + T(x + 24, 198, k[1], 52, C.tx, { w: 700 }),
+      { s: mix(0.85, 1, u), px: x + 135, py: 158, o: E(p, 0.2 + i * 0.08, 0.4 + i * 0.08) });
+  });
+  const rows = [['Client A', 'Algo A', C.gr], ['Northwind', 'Algo B', C.gr], ['Maple Ridge', 'Algo C', C.gr], ['Bluebird', 'Algo A', C.am]];
+  rows.forEach((r, i) => {
+    const u = E(p, 0.45 + i * 0.08, 0.7 + i * 0.08);
+    const y = 252 + i * 88;
+    s += G(R(244, y, 850, 72, 16, C.s2) + Ci(278, y + 36, 11, r[2]) + T(306, y + 45, r[0], 26, C.tx, { w: 600 }) +
+      chip(540, y + 16, textW(r[1], 24) + 44, 40, r[1], C.bl, 24) + spark(690, y + 18, 220, 36, 11 + i * 7, E(p, 0.6 + i * 0.08, 1), r[2] === C.gr ? C.gr : C.am, 4) +
+      T(1066, y + 45, r[2] === C.gr ? 'Live' : 'Check', 24, r[2], { a: 'end', w: 600 }), { y: (1 - u) * 16, o: u });
+  });
+  s += `</g>`;
+  return s;
+}
+const LASSO = { cx: 960, cy: 490, rx: 850, ry: 350, th0: Math.PI / 6, sweep: -2 * Math.PI - 0.4, t0: 1.7, t1: 4.2 };
+const esine = x => 0.5 - 0.5 * Math.cos(Math.PI * clamp(x));
+function lassoPt(u) {
+  const th = LASSO.th0 + LASSO.sweep * u, w = 1 + 0.035 * Math.sin(3 * th + 0.6);
+  return [LASSO.cx + Math.cos(th) * LASSO.rx * w, LASSO.cy + Math.sin(th) * LASSO.ry * w];
+}
+const lassoU = lt => esine(lin(lt, LASSO.t0, LASSO.t1));
+const DASH = { x: 400, y: 176, s: 1.15 };   // dashboard frame: 316..1604 x 130..843
+function beforeCursorPos(lt) {
+  if (lt < LASSO.t0) return curPos([[1.0, 1880, 1080], [LASSO.t0, ...lassoPt(0)]], lt);
+  if (lt <= LASSO.t1) return lassoPt(lassoU(lt));
+  return curPos([[LASSO.t1 + 0.15, ...lassoPt(1)], [5.6, 1716, 870], [9, 1716, 870]], lt);
+}
+function sBefore(lt) {
+  let s = '';
+  const fly0 = 4.45, flyD = 0.95, stag = 0.05;
+  const ORD = [2, 5, 6, 1, 3, 4, 7, 8, 0];   // the farthest icons leave first
+  const land = i => fly0 + ORD[i] * stag + flyD;
+  const solid0 = 5.85;
+  const pts = MESS.map((m, i) => {
+    const amp = 1 - E(lt, fly0 - 0.2, fly0 + 0.4);
+    const fx = m.x + Math.sin(lt * 0.9 + i * 1.7) * 18 * amp, fy = m.y + Math.cos(lt * 0.75 + i * 1.3) * 14 * amp;
+    const u = E(lt, fly0 + ORD[i] * stag, land(i));
+    // curved flight: control point pulled toward the frame centre with a sideways swing
+    const mx = (fx + m.tx) / 2, my = (fy + m.ty) / 2;
+    const cx = mix(mx, 960, 0.35), cy = mix(my, 486, 0.35) - 110;   // always curve inward, with a small hop
+    const v = 1 - u;
+    return [v * v * fx + 2 * v * u * cx + u * u * m.tx, v * v * fy + 2 * v * u * cy + u * u * m.ty, u];
+  });
+  // tangled links
+  const lo = E(lt, 0.6, 1.4) * (1 - E(lt, 4.15, 4.5));
+  if (lo > 0) {
+    MESS_LINKS.forEach(([a, b], k) => {
+      const [ax, ay] = pts[a], [bx, by] = pts[b];
+      const mx = (ax + bx) / 2 + Math.sin(k * 2.1) * 120, my = (ay + by) / 2 + Math.cos(k * 1.7) * 90;
+      s += `<path d="M${f(ax)} ${f(ay)} Q${f(mx)} ${f(my)} ${f(bx)} ${f(by)}" fill="none" stroke="${C.mu}" stroke-width="3" stroke-dasharray="10 12" stroke-dashoffset="${f(-lt * 30)}" opacity="${f(0.4 * lo)}"/>`;
+    });
+  }
+  // lasso drawn by the cursor
+  const lu = lassoU(lt);
+  const lassoFade = 1 - E(lt, 4.55, 5.25);
+  if (lu > 0.001 && lassoFade > 0.01) {
+    const N = 160, n = Math.max(1, Math.round(N * lu));
+    let d = '';
+    for (let k = 0; k <= n; k++) { const [px, py] = lassoPt(lu * k / n); d += (k ? ' L' : 'M') + f(px) + ' ' + f(py); }
+    const closed = E(lt, LASSO.t1, LASSO.t1 + 0.3);
+    const flash = Math.max(0, 1 - Math.abs(lt - (LASSO.t1 + 0.2)) / 0.35);
+    let L = '';
+    if (closed > 0) L += `<path d="${d} Z" fill="${C.bl}" fill-opacity="${f(0.07 * closed)}"/>`;
+    if (flash > 0) L += `<path d="${d}" fill="none" stroke="${C.bl}" stroke-width="16" filter="url(#glow)" opacity="${f(0.8 * flash)}"/>`;
+    L += `<path d="${d}" fill="none" stroke="#93c5fd" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${closed > 0.5 ? '1 0' : '16 12'}" stroke-dashoffset="${f(-lt * 40)}" opacity="0.9"/>`;
+    const shrink = E(lt, 4.45, 5.25);
+    s += G(L, { s: mix(1, 0.86, shrink), px: 960, py: 490, o: lassoFade });
+  }
+  // ghost frame the icons land in, then it solidifies into the dashboard
+  const gu = E(lt, 4.35, 4.8) * (1 - E(lt, solid0 + 0.1, solid0 + 0.5));
+  if (gu > 0) s += R(316, 130, 1288, 713, 30, C.bl, `fill-opacity="${f(0.05 * gu)}" stroke="#93c5fd" stroke-width="4" stroke-dasharray="18 14" opacity="${f(gu)}"`);
+  const du = EB(lt, solid0, solid0 + 0.6);
+  s += G(dashboard(lin(lt, solid0 + 0.15, solid0 + 1.85), lt), { x: DASH.x, y: DASH.y, s: DASH.s * mix(0.96, 1, du), px: 560, py: 310, o: E(lt, solid0, solid0 + 0.4) });
+  // icons
+  MESS.forEach((m, i) => {
+    const [x, y, u] = pts[i];
+    const pop = EB(lt, 0.2 + i * 0.12, 0.8 + i * 0.12);
+    const caught = Math.max(0, 1 - Math.abs(lt - (LASSO.t1 + 0.25)) / 0.3);
+    const wob = Math.sin(lt * 1.1 + i * 2) * 8 * (1 - u) + Math.sin(lt * 40 + i) * 6 * caught;
+    const o = E(lt, 0.2 + i * 0.12, 0.5 + i * 0.12) * (1 - E(lt, solid0, solid0 + 0.4));
+    const ic = m.k === 'vps' ? iconVps() : m.k === 'sheet' ? iconSheet() : m.k === 'chatB' ? iconChat(C.bl) : m.k === 'chatG' ? iconChat('#7c5cd6') : m.k === 'pdf' ? iconPdf() : iconClock(lt);
+    s += G(`<g filter="url(#shs)">${ic}</g>`, { x, y, r: wob + (i % 2 ? 6 : -6) * (1 - u), s: pop * mix(1, 0.5, u), o });
+  });
+  return {
+    svg: s, cursor: {
+      keys: [[0, 0, 0]], pos: beforeCursorPos,
+      clicks: [LASSO.t1 + 0.15], lt, op: fadeIO(lt, 1.0, 8.6, 0.35), trail: [LASSO.t0 - 0.2, LASSO.t1 - 0.1]
+    }
+  };
+}
+
+/* 3. Automatic close */
+const CLIENTS5 = ['Client A', 'Northwind', 'Maple Ridge', 'Bluebird', 'Harbor Point'];
+function bez(p0, p1, p2, p3, u) {
+  const v = 1 - u;
+  return [v * v * v * p0[0] + 3 * v * v * u * p1[0] + 3 * v * u * u * p2[0] + u * u * u * p3[0],
+    v * v * v * p0[1] + 3 * v * v * u * p1[1] + 3 * v * u * u * p2[1] + u * u * u * p3[1]];
+}
+function sClose(lt) {
+  let s = '';
+  const send = i => 2.9 + i * 0.75, arrive = i => send(i) + 1.45;
+  // clock
+  const cu = EB(lt, 0.2, 0.8);
+  const mins = 30 * E(lt, 0.8, 2.6);
+  const ma = mins * 6 * Math.PI / 180, ha = (120 + mins * 0.5) * Math.PI / 180;
+  const ding = lin(lt, 2.6, 3.4);
+  let ck = Ci(0, 0, 70, C.s2, `stroke="${ding > 0 ? C.gr : C.bd}" stroke-width="5"`);
+  for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6; ck += Ci(Math.cos(a) * 54, Math.sin(a) * 54, 3.5, C.mu); }
+  ck += `<line x1="0" y1="0" x2="${f(Math.sin(ha) * 32)}" y2="${f(-Math.cos(ha) * 32)}" stroke="${C.tx}" stroke-width="8" stroke-linecap="round"/>`;
+  ck += `<line x1="0" y1="0" x2="${f(Math.sin(ma) * 50)}" y2="${f(-Math.cos(ma) * 50)}" stroke="${C.bl}" stroke-width="6" stroke-linecap="round"/>` + Ci(0, 0, 8, C.tx);
+  if (ding > 0 && ding < 1) ck = Ci(0, 0, 70 + 40 * eout(ding), 'none', `stroke="${C.gr}" stroke-width="4" opacity="${f(1 - ding)}"`) + ck;
+  s += G(ck, { x: 720, y: 205, s: cu, o: cu });
+  const mm = String(Math.round(mins)).padStart(2, '0');
+  const tb = 1 + 0.12 * Math.sin(Math.PI * ding);
+  s += G(T(0, 0, `4:${mm} PM`, 60, ding > 0 ? C.gr : C.tx, { w: 700 }), { x: 820, y: 226, s: tb, px: 0, py: -20, o: E(lt, 0.4, 0.9) });
+  // VPS column
+  for (let i = 0; i < 5; i++) {
+    const y = 300 + i * 110, u = EB(lt, 0.3 + i * 0.1, 0.9 + i * 0.1);
+    const flash = Math.max(0, 1 - Math.abs(lt - send(i)) / 0.35);
+    let v = R(200, y, 236, 96, 20, C.s2, `stroke="${flash > 0 ? C.bl : C.bd}" stroke-width="3" filter="url(#shs)"`);
+    v += R(222, y + 22, 52, 14, 5, C.bd) + R(222, y + 46, 52, 14, 5, C.bd) + R(222, y + 70, 52, 6, 3, C.bd);
+    v += T(292, y + 58, `VPS 0${i + 1}`, 28, C.tx, { w: 700 });
+    if (flash > 0) v += Ci(410, y + 26, 18, C.bl, `filter="url(#glow)" opacity="${f(flash)}"`);
+    v += Ci(410, y + 26, 8, flash > 0.2 ? '#93c5fd' : C.gr);
+    s += G(v, { x: (1 - u) * -60, o: E(lt, 0.3 + i * 0.1, 0.7 + i * 0.1) });
+  }
+  // panel
+  const pu = EB(lt, 0.6, 1.3);
+  let p = card(1150, 230, 600, 600);
+  const got = [0, 1, 2, 3, 4].filter(i => lt >= arrive(i)).length;
+  p += T(1190, 296, 'Daily close', 36, C.tx, { w: 700 });
+  p += T(1712, 294, `${got} of 5`, 28, got === 5 ? C.gr : C.mu, { a: 'end', w: 600 });
+  for (let i = 0; i < 5; i++) {
+    const y = 330 + i * 96, a = arrive(i), ru = EB(lt, a, a + 0.5), done = lt >= a;
+    p += R(1180, y, 540, 80, 18, C.s2);
+    if (done && lt < a + 0.6) p += R(1180, y, 540, 80, 18, C.gr, `opacity="${f(0.25 * (1 - lin(lt, a, a + 0.6)))}"`);
+    p += Ci(1226, y + 40, 21, 'none', `stroke="${C.off}" stroke-width="3" stroke-dasharray="6 6" opacity="${f(1 - ru)}"`);
+    p += G(Ci(1226, y + 40, 21, C.gr) + check(1226, y + 40, 1.05, '#fff', 4.5), { s: ru, px: 1226, py: y + 40 });
+    p += T(1264, y + 50, CLIENTS5[i], 28, C.tx, { w: 600 });
+    p += spark(1450, y + 24, 110, 32, 31 + i * 5, E(lt, a + 0.1, a + 0.9), C.gr, 4);
+    p += T(1700, y + 50, done ? 'Received' : 'Waiting', 24, done ? C.gr : C.mu, { a: 'end', w: 600, op: done ? E(lt, a, a + 0.3) : 1 });
+  }
+  s += G(p, { s: mix(0.92, 1, pu), px: 1450, py: 530, o: E(lt, 0.6, 1.1) });
+  // packets
+  for (let i = 0; i < 5; i++) {
+    const t0 = send(i), t1 = arrive(i);
+    const p0 = [440, 348 + i * 110], p3 = [1176, 370 + i * 96], p1 = [760, p0[1]], p2 = [860, p3[1]];
+    const lo = E(lt, t0 - 0.1, t0 + 0.3);
+    const gu = E(lt, t1, t1 + 0.8);
+    if (lo > 0) s += `<path d="M${p0[0]} ${p0[1]} C${p1[0]} ${p1[1]} ${p2[0]} ${p2[1]} ${p3[0]} ${p3[1]}" fill="none" stroke="${gu > 0.5 ? C.gr : C.bl}" stroke-width="3" stroke-dasharray="4 10" stroke-dashoffset="${f(-lt * 24)}" opacity="${f(lo * mix(0.45, 0.3, gu))}"/>`;
+    if (lt >= t0 && lt <= t1) {
+      const u = eio((lt - t0) / (t1 - t0));
+      for (let k = 6; k >= 1; k--) {
+        const uu = clamp(u - k * 0.025); const [tx, ty] = bez(p0, p1, p2, p3, uu);
+        s += Ci(tx, ty, 11 * (1 - k / 7), '#93c5fd', `opacity="${f(0.6 * (1 - k / 7))}"`);
+      }
+      const [hx, hy] = bez(p0, p1, p2, p3, u);
+      s += Ci(hx, hy, 22, C.bl, 'filter="url(#glow)" opacity="0.9"') + Ci(hx, hy, 12, '#dbeafe');
+    }
+    const ar = lin(lt, t1, t1 + 0.5);
+    if (ar > 0 && ar < 1) s += Ci(1176, 370 + i * 96, 10 + 30 * eout(ar), 'none', `stroke="${C.gr}" stroke-width="4" opacity="${f(1 - ar)}"`);
+  }
+  const bu = EB(lt, 8.0, 8.6);
+  s += G(R(-170, -28, 340, 56, 28, C.bg) + R(-170, -28, 340, 56, 28, C.gr, 'fill-opacity="0.16"') + Ci(-136, 0, 15, C.gr) + check(-136, 0, 0.75, '#fff', 3.5) +
+    T(12, 9, 'Done automatically', 26, C.gr, { a: 'middle', w: 700 }), { x: 790, y: 560, s: mix(0.7, 1, bu), o: clamp(bu) });
+  return { svg: s };
+}
+
+/* 4. Live status */
+const ACCTS = [['ACC 01', 'Client A', 'Algo A'], ['ACC 02', 'Northwind', 'Algo B'], ['ACC 03', 'Maple Ridge', 'Algo C'],
+  ['ACC 04', 'Bluebird', 'Algo A'], ['ACC 05', 'Harbor Point', 'Algo D'], ['ACC 06', 'Summit', 'Algo B']];
+function sStatus(lt) {
+  let s = '';
+  const pu = EB(lt, 0.1, 0.8);
+  const onT = i => 0.9 + i * 0.35;
+  const scan0 = 3.2, scan1 = 4.7;
+  const amberT = scan0 + (scan1 - scan0) * (3.5 / 6);
+  let p = card(240, 150, 1100, 700);
+  p += T(284, 222, 'Accounts', 40, C.tx, { w: 700 });
+  // refresh chip
+  const spin = lt * 60 + 300 * E(lt, scan0, scan1);
+  p += R(1012, 182, 292, 54, 27, C.s2, `stroke="${C.bd}" stroke-width="2"`);
+  p += G(`<path d="M-11 -6 A13 13 0 1 1 -6 11" fill="none" stroke="${C.bl}" stroke-width="4" stroke-linecap="round"/><path d="M-17 -12 L-11 -4 L-3 -10" fill="none" stroke="${C.bl}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`, { x: 1046, y: 209, r: spin });
+  p += T(1072, 218, 'Every 10 min', 26, C.tx, { w: 600 });
+  p += T(296, 284, 'Status', 26, C.mu, { w: 600 }) + T(400, 284, 'Account', 26, C.mu, { w: 600 }) + T(580, 284, 'Client', 26, C.mu, { w: 600 }) + T(870, 284, 'Algorithm', 26, C.mu, { w: 600 });
+  const sel = 3;
+  const hiU = E(lt, 6.5, 6.9);
+  ACCTS.forEach((a, i) => {
+    const y = 302 + i * 88, cy = y + 37;
+    const on = lt >= onT(i), am = i === sel && lt >= amberT;
+    const color = am ? C.am : on ? C.gr : C.off;
+    let r = R(270, y, 1040, 74, 18, C.s2);
+    if (i === sel && hiU > 0) r += R(270, y, 1040, 74, 18, C.am, `fill-opacity="${f(0.12 * hiU)}" stroke="${C.am}" stroke-width="3" stroke-opacity="${f(hiU)}"`);
+    const lp = lin(lt, onT(i), onT(i) + 0.6);
+    if (lp > 0 && lp < 1) r += Ci(330, cy, 14 + 26 * eout(lp), 'none', `stroke="${C.gr}" stroke-width="4" opacity="${f(1 - lp)}"`);
+    if (am) {
+      const ap = ((lt - amberT) % 1.3) / 1.3;
+      r += Ci(330, cy, 14 + 24 * eout(ap), 'none', `stroke="${C.am}" stroke-width="4" opacity="${f(0.9 * (1 - ap))}"`);
+    }
+    const breathe = on && !am ? 0.25 + 0.2 * Math.sin(lt * 3 + i) : 0;
+    if (on) r += Ci(330, cy, 20, color, `filter="url(#glow)" opacity="${f(am ? 0.6 : breathe)}"`);
+    const shake = am ? Math.sin((lt - amberT) * 40) * 5 * (1 - lin(lt, amberT, amberT + 0.6)) : 0;
+    r += Ci(330 + shake, cy, 14 * (on ? 1 + 0.25 * Math.sin(Math.PI * lp) : 1), color);
+    r += T(400, cy + 10, a[0], 28, C.tx, { w: 700 }) + T(580, cy + 10, a[1], 28, C.tx, { w: 500 }) + chip(870, cy - 20, textW(a[2], 24) + 44, 40, a[2], C.bl, 24);
+    r += T(1280, cy + 9, am ? 'Disconnected' : on ? 'Connected' : 'Checking', 26, am ? C.am : on ? C.gr : C.mu, { a: 'end', w: 600 });
+    p += G(r, { y: (1 - E(lt, 0.3 + i * 0.08, 0.8 + i * 0.08)) * 16, o: E(lt, 0.3 + i * 0.08, 0.8 + i * 0.08) });
+  });
+  // scan band
+  const sb = lin(lt, scan0, scan1);
+  if (sb > 0 && sb < 1) {
+    const yy = 300 + eio(sb) * 530;
+    p += R(270, yy - 10, 1040, 20, 10, C.bl, `opacity="${f(0.35 * Math.sin(Math.PI * sb))}" filter="url(#glow)"`);
+    p += R(270, yy - 2, 1040, 4, 2, '#93c5fd', `opacity="${f(0.8 * Math.sin(Math.PI * sb))}"`);
+  }
+  s += G(p, { s: mix(0.93, 1, pu), px: 790, py: 500, o: E(lt, 0.1, 0.6) });
+  // detail card
+  const cu = EB(lt, 6.75, 7.45);
+  const cy = 302 + sel * 88 + 37;
+  const cardY = cy - 120;
+  let d = card(1390, cardY, 450, 252);
+  d += R(1390, cardY, 12, 252, 6, C.am);
+  d += Ci(1438, cardY + 48, 11, C.am) + T(1462, cardY + 58, 'ACC 04', 30, C.tx, { w: 700 });
+  d += T(1426, cardY + 118, 'Disconnected', 38, C.am, { w: 700 });
+  d += T(1426, cardY + 162, 'from the server', 38, C.tx, { w: 600 });
+  d += T(1426, cardY + 214, 'Flagged on the latest check', 26, C.mu, { w: 500 });
+  const lu = E(lt, 6.7, 7.2);
+  if (lu > 0) s += `<line x1="1310" y1="${cy}" x2="${f(1310 + 80 * lu)}" y2="${cy}" stroke="${C.am}" stroke-width="4" stroke-linecap="round" stroke-dasharray="2 9"/>`;
+  s += G(d, { s: mix(0.6, 1, cu), px: 1390, py: cy, o: E(lt, 6.75, 7.1) });
+  const SX = -80;   // keep the table plus detail card centred in the frame
+  return {
+    svg: G(s, { x: SX }), cursor: {
+      keys: [[4.8, 1880, 1080], [6.3, 334 + SX, cy + 4], [7.6, 334 + SX, cy + 4], [8.6, 1480 + SX + 80, 830], [11, 1480, 830]],
+      clicks: [6.45], lt, op: fadeIO(lt, 4.8, 10.8, 0.35)
+    }
+  };
+}
+
+/* 5. Algorithms */
+const ALGOS = [['Algo A', 1.0], ['Algo B', 0.78], ['Algo C', 0.6], ['Algo D', 0.44]];
+function sAlgos(lt) {
+  let s = '';
+  const c1 = 3.5, c2 = 4.2, c3 = 9.0;
+  const mv = E(lt, 2.4, 3.2);          // ranking starts centred, then slides into the two column layout
+  const sk = E(lt, 2.6, 3.3);          // skeleton of the other panels at 30%
+  // ranking card
+  let p = card(140, 140, 800, 362);
+  p += T(180, 200, 'Algorithm ranking', 34, C.tx, { w: 700 });
+  p += T(900, 200, 'Hottest on top', 28, C.mu, { a: 'end', w: 500 });
+  ALGOS.forEach(([n, L], i) => {
+    const y = 228 + i * 66, cy = y + 28;
+    const selT = i === 0 ? c1 : i === 1 ? c2 : null;
+    const su = selT != null ? EB(lt, selT, selT + 0.4) : 0;
+    let r = R(166, y, 748, 56, 16, C.s2, su > 0 ? `stroke="${C.bl}" stroke-width="3" stroke-opacity="${f(clamp(su))}"` : '');
+    r += Ci(198, cy, 15, 'none', `stroke="${C.bd}" stroke-width="3"`);
+    if (su > 0) r += G(Ci(198, cy, 15, C.bl) + check(198, cy, 0.8, '#fff', 3.5), { s: su, px: 198, py: cy });
+    r += T(230, cy + 10, n, 28, C.tx, { w: 700 });
+    const bu = E(lt, 0.6 + i * 0.18, 1.7 + i * 0.18);
+    r += R(360, cy - 11, 410, 22, 11, C.bg);
+    r += R(360, cy - 11, 410 * L * bu, 22, 11, i === 0 ? 'url(#hotG)' : 'url(#blueBar)', i === 0 ? '' : `opacity="${f(1 - i * 0.15)}"`);
+    if (i === 0) {
+      const hu = EB(lt, 1.8, 2.3);
+      r += G(R(-58, -20, 116, 40, 20, C.am, 'fill-opacity="0.2"') +
+        `<path transform="translate(-8 0)" d="M-30 9 C-38 -1 -30 -9 -27 -15 C-25 -7 -20 -6 -20 -6 C-20 -12 -16 -18 -12 -21 C-12 -11 -4 -7 -4 3 C-4 10 -10 14 -17 14 C-24 14 -28 12 -30 9 Z" fill="${C.am}"/>` +
+        T(20, 9, 'Hot', 24, C.am, { a: 'middle', w: 700 }), { x: 842, y: cy, s: hu, o: clamp(hu) });
+    }
+    p += G(r, { x: (1 - E(lt, 0.3 + i * 0.1, 0.8 + i * 0.1)) * -30, o: E(lt, 0.3 + i * 0.1, 0.8 + i * 0.1) });
+  });
+  const rankSvg = G(p, { x: mix(420, 0, mv), y: mix(119, 0, mv), s: mix(1.15, 1, mv), px: 540, py: 321, o: E(lt, 0.0, 0.5) });
+  // combined chart
+  const chU = E(lt, 4.4, 5.0);
+  let ch = card(140, 532, 800, 330);
+  ch += T(180, 588, 'A + B combined', 30, C.tx, { w: 700 });
+  const lg = (x, col, lab) => R(x, 570, 26, 8, 4, col) + T(x + 36, 582, lab, 24, C.mu, { w: 600 });
+  ch += lg(510, C.am, 'Algo A') + lg(660, C.bl, 'Algo B') + lg(810, C.gr, 'Both');
+  const a = walk(5, 40, 0.5, 2.6), b = walk(9, 40, 0.35, 2.4), comb = a.map((v, i) => v + b[i]);
+  const lo = Math.min(...a, ...b, ...comb), hi = Math.max(...a, ...b, ...comb);
+  const pa = scalePts(a, 180, 615, 720, 210, lo, hi), pb = scalePts(b, 180, 615, 720, 210, lo, hi), pc = scalePts(comb, 180, 615, 720, 210, lo, hi);
+  ch += `<line x1="180" x2="900" y1="${f(pc[0][1])}" y2="${f(pc[0][1])}" stroke="${C.bd}" stroke-width="2" stroke-dasharray="6 8"/>`;
+  const ua = E(lt, 4.7, 6.1), uc = E(lt, 5.5, 7.0);
+  ch += `<path d="${pathFrom(pa, ua).d}" fill="none" stroke="${C.am}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>`;
+  ch += `<path d="${pathFrom(pb, ua).d}" fill="none" stroke="${C.bl}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" opacity="0.75"/>`;
+  const pcc = pathFrom(pc, uc);
+  if (uc > 0) {
+    ch += `<path d="${pcc.d} L${f(pcc.head[0])} 825 L180 825 Z" fill="url(#areaG)"/>`;
+    ch += `<path d="${pcc.d}" fill="none" stroke="${C.gr}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>`;
+    ch += Ci(pcc.head[0], pcc.head[1], 16, C.gr, 'filter="url(#glow)"') + Ci(pcc.head[0], pcc.head[1], 9, '#fff');
+  }
+  s += G(ch, { o: Math.max(0.3 * sk, chU) });
+  // worth a look
+  const wu = E(lt, 6.9, 7.5);
+  let w = card(1000, 140, 780, 722);
+  w += Ci(1056, 202, 22, C.am, 'fill-opacity="0.2"') + R(1053, 188, 6, 18, 3, C.am) + Ci(1056, 214, 3.5, C.am);
+  w += T(1092, 214, 'Worth a look', 36, C.tx, { w: 700 });
+  w += T(1040, 268, 'Each account compared with the desk', 28, C.mu, { w: 500 });
+  // dot strip
+  w += R(1040, 296, 700, 150, 18, C.s2);
+  w += `<line x1="1140" x2="1716" y1="400" y2="400" stroke="${C.bd}" stroke-width="3" stroke-dasharray="8 8"/>`;
+  w += T(1062, 409, 'Desk', 24, C.mu, { w: 600 });
+  const jr = rng(42);
+  for (let k = 0; k < 14; k++) {
+    const x = 1160 + k * 40, out = k === 9;
+    const y = out ? 334 : 400 + (jr() - 0.5) * 16;
+    const du = EB(lt, 7.2 + k * 0.05, 7.6 + k * 0.05);
+    if (out) {
+      const pp = ((lt - 7.8) % 1.2) / 1.2;
+      if (lt > 7.8) w += Ci(x, y, 14 + 18 * eout(pp), 'none', `stroke="${C.am}" stroke-width="3" opacity="${f(0.8 * (1 - pp))}"`);
+      w += G(Ci(x, y, 14, C.am), { s: du, px: x, py: y });
+    } else w += G(Ci(x, y, 10, '#5b7aa6'), { s: du, px: x, py: y });
+  }
+  // detail
+  const dt = E(lt, c3 + 0.2, c3 + 0.9);
+  let dd = '';
+  dd += T(1040, 520, 'ACC 09', 32, C.tx, { w: 700 }) + T(1168, 520, 'Cedar Lane', 32, C.mu, { w: 500 });
+  dd += R(1040, 552, 700, 92, 18, C.s2);
+  dd += T(1072, 608, 'Algorithm', 28, C.mu, { w: 600 }) + T(1300, 608, 'Algo A', 30, C.tx, { w: 700 });
+  dd += Ci(1500, 598, 15, C.gr) + check(1500, 598, 0.8, '#fff', 3.5) + T(1528, 607, 'Same as desk', 24, C.gr, { w: 600 });
+  const hb = EB(lt, c3 + 0.8, c3 + 1.3);
+  dd += R(1040, 664, 700, 110, 18, C.am, `fill-opacity="${f(0.14 * clamp(hb))}" stroke="${C.am}" stroke-width="3" stroke-opacity="${f(clamp(hb))}"`);
+  dd += T(1072, 730, 'Batch size', 28, C.mu, { w: 600 });
+  dd += T(1268, 704, 'This account', 24, C.mu, { w: 600 });
+  dd += G(T(0, 0, '6', 46, C.am, { w: 700 }), { x: 1268, y: 756, s: mix(0.7, 1, hb), px: 14, py: -16 });
+  dd += T(1458, 704, 'Desk', 24, C.mu, { w: 600 });
+  dd += T(1458, 756, '2', 46, C.tx, { w: 700 });
+  dd += T(1708, 740, 'Differs', 26, C.am, { a: 'end', w: 700, op: clamp(hb) });
+  dd += T(1040, 822, 'Account setting compared with the desk', 26, C.mu, { w: 500, op: E(lt, c3 + 1.2, c3 + 1.7) });
+  w += G(dd, { y: (1 - dt) * 24, o: dt });
+  s += G(w, { o: mix(0.3 * sk, 1, wu) });
+  s += rankSvg;   // drawn last so the sliding card stays above the faded panels
+  return {
+    svg: s, cursor: {
+      keys: [[2.5, 1060, 1080], [3.3, 202, 260], [4.0, 202, 324], [5.4, 760, 760], [7.6, 760, 760], [8.85, 1522, 340], [10.2, 1522, 340], [11.3, 1800, 896], [13.6, 1800, 896]],
+      clicks: [c1, c2, c3], lt, op: fadeIO(lt, 2.5, 13.4, 0.35)
+    }
+  };
+}
+
+/* 6. Reports */
+const RCLIENTS = ['Client A', 'Northwind', 'Maple Ridge', 'Bluebird'];
+function page(name, seed) {
+  let s = R(-100, -130, 200, 260, 16, C.paper, 'filter="url(#shs)"');
+  s += `<path d="M-84 -130 H84 A16 16 0 0 1 100 -114 V-84 H-100 V-114 A16 16 0 0 1 -84 -130 Z" fill="${C.bl}"/>`;
+  s += T(-82, -98, 'REPORT', 22, '#dbeafe', { w: 700, ls: 2 });
+  s += T(-82, -50, name, 24, C.ink, { w: 700 });
+  s += R(-82, -34, 164, 70, 10, '#e2e8f0');
+  s += spark(-72, -26, 144, 52, seed, 1, C.gr, 4);
+  for (let i = 0; i < 3; i++) s += R(-82, 54 + i * 22, 164 - i * 34, 10, 5, '#cbd5e1');
+  return s;
+}
+function sReports(lt) {
+  let s = '';
+  const click = 2.35;
+  // panel: left third
+  let p = card(150, 170, 480, 640);
+  p += T(190, 236, 'Client reports', 36, C.tx, { w: 700 });
+  p += R(180, 260, 210, 46, 23, C.s2, `stroke="${C.bd}" stroke-width="2"`) + T(285, 292, 'September', 24, C.tx, { a: 'middle', w: 600 });
+  RCLIENTS.forEach((n, i) => {
+    const y = 340 + i * 70;
+    const u = E(lt, 0.3 + i * 0.1, 0.8 + i * 0.1);
+    p += G(R(180, y, 420, 56, 14, C.s2) + R(200, y + 14, 28, 28, 8, C.bl) + check(214, y + 28, 0.7, '#fff', 3.5) + T(246, y + 38, n, 28, C.tx, { w: 600 }), { x: (1 - u) * -20, o: u });
+  });
+  const press = Math.sin(Math.PI * lin(lt, click - 0.05, click + 0.3));
+  const glowB = 0.5 + 0.5 * Math.sin(lt * 4);
+  let btn = '';
+  if (lt < click) btn += R(180, 668, 420, 84, 22, C.bl, `filter="url(#glow)" opacity="${f(0.35 * glowB * E(lt, 0.8, 1.3))}"`);
+  btn += R(180, 668, 420, 84, 22, C.bl) + T(390, 722, 'Build report', 34, '#fff', { a: 'middle', w: 700 });
+  p += G(btn, { s: 1 - 0.07 * press, px: 390, py: 710 });
+  s += G(p, { o: E(lt, 0, 0.5), y: (1 - E(lt, 0, 0.6)) * 20 });
+  // tray: right third (back)
+  const TX = 1510, tu = EB(lt, 0.6, 1.2);
+  const dropT = k => 4.7 + k * 0.55;
+  const landed = [0, 1, 2, 3].filter(k => lt >= dropT(k) + 0.95).length;
+  const allIn = E(lt, dropT(3) + 0.95, dropT(3) + 1.4);
+  const edge = allIn > 0 ? C.gr : C.bd;
+  let trB = '';
+  if (allIn > 0) trB += R(TX - 210, 640, 420, 190, 28, C.gr, `filter="url(#glow)" opacity="${f(allIn * (0.22 + 0.12 * Math.sin(lt * 3)))}"`);
+  trB += R(TX - 210, 640, 420, 190, 28, C.s2, `stroke="${edge}" stroke-width="3" filter="url(#sh)"`);
+  trB += R(TX - 186, 660, 372, 40, 14, C.bg);
+  s += G(trB, { s: tu, px: TX, py: 735, o: clamp(tu) });
+  // flow line linking the button, the fan and the tray, so the middle of the frame stays connected
+  const fl = E(lt, 2.5, 3.4);
+  if (fl > 0) s += `<path d="M612 700 C 820 640, 860 560, 1020 560 S 1330 590, 1420 650" fill="none" stroke="${allIn > 0.5 ? C.gr : C.bl}" stroke-width="4" stroke-linecap="round" stroke-dasharray="3 16" stroke-dashoffset="${f(-lt * 40)}" pathLength="1000" opacity="${f(0.55 * fl)}"/>` +
+    Ci(1420, 650, 7, allIn > 0.5 ? C.gr : C.bl, `opacity="${f(0.7 * fl)}"`);
+  // pages: fan out through the centre, then travel right into the tray
+  for (let k = 0; k < 4; k++) {
+    const t0 = 2.55 + k * 0.13;
+    const ou = E(lt, t0, t0 + 1.0), sc = EB(lt, t0, t0 + 1.0);
+    const fx = 1020 + (k - 1.5) * 185, fy = 380 + Math.abs(k - 1.5) * 20, fr = [-10, -3.5, 3.5, 10][k];
+    const d0 = dropT(k), du = E(lt, d0, d0 + 0.95);
+    const bob = Math.sin(lt * 2 + k) * 5 * E(lt, t0 + 1, t0 + 1.4) * (1 - du);
+    const ex = TX + (k - 1.5) * 76, ey = 686, er = (k - 1.5) * 5;
+    let x = mix(390, fx, ou), y = mix(710, fy, ou) + bob - Math.sin(Math.PI * ou) * 60, r = fr * ou, s2 = mix(0.15, 1, clamp(sc));
+    x = mix(x, ex, du); y = mix(y, ey, du) - Math.sin(Math.PI * du) * 110; r = mix(r, er, du); s2 = mix(s2, 0.56, du);
+    s += G(page(RCLIENTS[k], 70 + k * 9), { x, y, r, s: s2, o: E(lt, t0, t0 + 0.2) });
+  }
+  // tray (front lip)
+  let trF = `<path d="M${TX - 210} 712 H${TX + 210} V802 A28 28 0 0 1 ${TX + 182} 830 H${TX - 182} A28 28 0 0 1 ${TX - 210} 802 Z" fill="${C.s2}" stroke="${edge}" stroke-width="3"/>`;
+  trF += `<line x1="${TX - 208}" x2="${TX + 208}" y1="712" y2="712" stroke="${edge}" stroke-width="3"/>`;
+  trF += T(TX, 784, allIn > 0.5 ? '4 reports ready to send' : 'Ready to send', 30, allIn > 0.5 ? C.gr : C.tx, { a: 'middle', w: 700 });
+  if (landed > 0) {
+    const lb = dropT(landed - 1) + 0.95;
+    const bu = EB(lt, lb, lb + 0.4);
+    trF += G(Ci(0, 0, 28, allIn > 0 ? C.gr : C.bl) + T(0, 10, String(landed), 30, '#fff', { a: 'middle', w: 700 }), { x: TX + 204, y: 646, s: mix(0.7, 1, clamp(bu)) });
+  }
+  s += G(trF, { s: tu, px: TX, py: 735, o: clamp(tu) });
+  return {
+    svg: s, cursor: {
+      keys: [[0.7, 1500, 1080], [2.15, 400, 718], [3.2, 400, 718], [4.4, 1180, 830], [6.9, 1180, 830], [7.9, 1766, 800], [10, 1766, 800]],
+      clicks: [click], lt, op: fadeIO(lt, 0.7, 9.8, 0.35)
+    }
+  };
+}
+
+/* 7. History */
+const HV = (() => { const r = rng(2024); const out = []; for (let i = 0; i < 130; i++) { const v = (r() - 0.38) * 2; out.push(clamp(v, -1, 1)); } return out; })();
+function sHistory(lt) {
+  let s = '';
+  const curveU = E(lt, 3.9, 7.6);
+  let h = card(210, 130, 1500, 360);
+  h += T(250, 192, 'Daily closes', 34, C.tx, { w: 700 });
+  h += R(1380, 172, 26, 26, 6, C.rd, 'fill-opacity="0.75"') + T(1416, 194, 'Loss', 26, C.mu, { w: 600 });
+  h += R(1516, 172, 26, 26, 6, C.gr) + T(1552, 194, 'Gain', 26, C.mu, { w: 600 });
+  ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].forEach((d, i) => { h += T(250, 254 + i * 46, d, 24, C.mu, { w: 600 }); });
+  const headX = 324 + clamp(curveU * 26 - 0.5, 0, 25) * 50;   // highlight glides with the cursor
+  for (let c = 0; c < 26; c++) {
+    const ct = 0.5 + c * 0.12;
+    for (let d = 0; d < 5; d++) {
+      const v = HV[c * 5 + d];
+      const x = 330 + c * 50, y = 230 + d * 46;
+      const u = EB(lt, ct + d * 0.03, ct + d * 0.03 + 0.45);
+      h += R(x, y, 40, 38, 8, C.s2);
+      const col = v < -0.35 ? C.rd : C.gr;
+      const op = v < -0.35 ? 0.35 + 0.5 * Math.abs(v) : 0.22 + 0.78 * clamp((v + 0.35) / 1.35);
+      h += G(R(x, y, 40, 38, 8, col, `fill-opacity="${f(op)}"`), { s: clamp(u, 0, 1.2), px: x + 20, py: y + 19 });
+    }
+  }
+  const hlo = E(lt, 3.7, 4.0) * (1 - E(lt, 7.7, 8.1));
+  if (hlo > 0) h += R(headX, 222, 52, 236, 12, C.tx, `fill-opacity="0.08" stroke="${C.tx}" stroke-width="3" opacity="${f(0.85 * hlo)}"`);
+  s += G(h, { o: E(lt, 0, 0.5), y: (1 - E(lt, 0, 0.6)) * 20 });
+  // curve
+  let c = card(210, 520, 1500, 360);
+  c += T(250, 578, 'Cumulative', 34, C.tx, { w: 700 });
+  let acc = 0; const cum = HV.map(v => (acc += v + 0.12));
+  cum.unshift(0);
+  const pts = scalePts(cum, 270, 610, 1390, 200);
+  for (let g = 0; g < 4; g++) c += `<line x1="270" x2="1660" y1="${610 + g * 66}" y2="${610 + g * 66}" stroke="${C.bd}" stroke-width="1.5" opacity="0.6"/>`;
+  ['Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'].forEach((m, i) => { c += T(300 + i * 250, 856, m, 24, C.mu, { a: 'middle', w: 600 }); });
+  if (curveU > 0) {
+    const pp = pathFrom(pts, curveU);
+    c += `<path d="${pp.d} L${f(pp.head[0])} 810 L270 810 Z" fill="url(#areaG)"/>`;
+    c += `<path d="${pp.d}" fill="none" stroke="${C.gr}" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>`;
+    c += Ci(pp.head[0], pp.head[1], 18, C.gr, 'filter="url(#glow)"') + Ci(pp.head[0], pp.head[1], 10, '#fff');
+  }
+  s += G(c, { o: E(lt, 0.3, 0.8), y: (1 - E(lt, 0.3, 0.9)) * 20 });
+  const pos = v => {
+    if (v < 3.9) return curPos([[2.3, 1880, 1080], [3.75, 350, 446]], v);
+    if (v <= 7.6) return [26 + 324 + clamp(E(v, 3.9, 7.6) * 26 - 0.5, 0, 25) * 50, 446];
+    return curPos([[7.75, 1626, 446], [8.6, 1750, 468]], v);
+  };
+  return { svg: s, cursor: { keys: [[0, 0, 0]], pos, clicks: [], lt, op: fadeIO(lt, 2.3, 9.0, 0.35) } };
+}
+
+/* 8. Each rep, their book */
+const BOOKS = [['Client A', 'Northwind', 'Maple Ridge'], ['Bluebird', 'Harbor Point', 'Summit'], ['Client G', 'Client H', 'Client I']];
+function sBook(lt) {
+  let s = '';
+  const cols = [540, 960, 1380], rings = [C.bl, C.gr, C.am];
+  // desk outline
+  const mc = 3.4;                       // cursor clicks the Manager
+  const ou = E(lt, mc + 0.85, mc + 1.7);
+  if (ou > 0) {
+    s += R(330, 380, 1260, 390, 32, C.bl, `fill-opacity="${f(0.06 * ou)}" stroke="${C.bl}" stroke-width="3" stroke-dasharray="14 12" pathLength="1000" opacity="${f(ou)}"`);
+    s += G(R(-100, -24, 200, 48, 24, C.bg) + chip(-100, -24, 200, 48, 'Whole desk', C.bl, 24, 0.25), { x: 960, y: 770, s: EB(lt, mc + 1.3, mc + 1.8) });
+  }
+  // manager
+  const mu = EB(lt, 2.3, 2.9);
+  for (let k = 0; k < 3; k++) {
+    const lu = E(lt, mc + 0.15 + k * 0.1, mc + 0.85 + k * 0.1);
+    if (lu > 0) {
+      const x0 = 960, y0 = 270, x1 = cols[k], y1 = 398;
+      s += `<line x1="${x0}" y1="${y0}" x2="${f(mix(x0, x1, lu))}" y2="${f(mix(y0, y1, lu))}" stroke="${C.bl}" stroke-width="4" stroke-linecap="round" opacity="0.7"/>`;
+    }
+  }
+  const halo = lt > mc ? E(lt, mc, mc + 0.3) * (0.3 + 0.15 * Math.sin(lt * 3)) : 0;
+  const press = Math.sin(Math.PI * lin(lt, mc - 0.05, mc + 0.3));
+  s += G(Ci(960, 200, 80, C.bl, `filter="url(#glow)" opacity="${f(halo)}"`) + G(avatar(960, 200, 58, '#93c5fd'), { s: 1 - 0.08 * press, px: 960, py: 200 }) +
+    T(1040, 192, 'Manager', 34, C.tx, { w: 700 }) + T(1040, 230, 'Sees every book', 28, C.mu, { w: 500 }), { s: mu, px: 960, py: 200, o: clamp(mu) });
+  cols.forEach((cx, k) => {
+    const au = EB(lt, 0.2 + k * 0.15, 0.8 + k * 0.15);
+    s += G(avatar(cx, 450, 46, rings[k]), { s: au, px: cx, py: 450, o: clamp(au) });
+    s += T(cx, 536, `Rep ${k + 1}`, 28, C.tx, { a: 'middle', w: 700, op: E(lt, 0.4 + k * 0.15, 0.8 + k * 0.15) });
+    BOOKS[k].forEach((n, j) => {
+      const t0 = 0.9 + k * 0.12 + j * 0.14, u = E(lt, t0, t0 + 0.5);
+      const y = 560 + j * 64;
+      const lit = ou * 0.5;
+      s += G(R(cx - 140, y, 260, 52, 14, C.s2, `stroke="${lit > 0 ? C.bl : C.bd}" stroke-opacity="${f(0.4 + lit)}" stroke-width="2"`) + R(cx - 140, y, 8, 52, 4, rings[k]) +
+        T(cx - 116, y + 35, n, 24, C.tx, { w: 600 }), { y: (1 - u) * -40, o: u });
+    });
+    const lku = EB(lt, 1.8 + k * 0.12, 2.3 + k * 0.12);
+    // one lock per book, centred on the three row stack
+    s += G(R(cx + 130, 566, 4, 172, 2, C.mu, 'opacity="0.35"') + lock(cx + 160, 646, 1.2, E(lt, 2.1 + k * 0.12, 2.4 + k * 0.12)), { s: lku, px: cx + 160, py: 652, o: clamp(lku) });
+  });
+  return {
+    svg: s, cursor: {
+      keys: [[1.7, 1880, 1080], [3.2, 972, 214], [3.75, 972, 214], [4.8, 1560, 300], [7.5, 1560, 300]],
+      clicks: [mc], lt, op: fadeIO(lt, 1.7, 7.3, 0.35)
+    }
+  };
+}
+
+/* 9. Outro */
+function sOutro(lt, dur) {
+  let s = '';
+  const lu = EB(lt, 0.15, 0.8);
+  s += G(logo(120, E(lt, 0.4, 1.0)), { x: 900, y: 190, s: lu, px: 60, py: 60, o: clamp(lu) });
+  const wu = E(lt, 0.5, 1.1);
+  s += G(wordmark(960, 440, 96), { y: (1 - wu) * 24, o: wu });
+  const stats = ['Every account', 'Every close', 'Every report'];   // word pills: they pop, no counter
+  stats.forEach((st, i) => {
+    const cx = 520 + i * 440, t0 = 1.1 + i * 0.2;
+    const cu = EB(lt, t0, t0 + 0.6);
+    // first word strong, the rest muted; dot plus words centred as one group, measured with textW
+    const sp = st.indexOf(' '), w1 = st.slice(0, sp), w2 = st.slice(sp + 1);
+    const cw = textW(w1 + ' ', 40, 700) + textW(w2, 40, 500), gw = 20 + 18 + cw, x0 = cx - gw / 2;
+    const ch = R(cx - 190, 520, 380, 124, 62, C.s1, `stroke="${C.bd}" stroke-width="2" filter="url(#sh)"`) +
+      Ci(x0 + 10, 582, 10, [C.bl, C.gr, C.am][i]) +
+      `<text x="${f(x0 + 38)}" y="596" font-weight="700" font-size="40" fill="${C.tx}">${w1} <tspan font-weight="500" fill="${C.mu}">${w2}</tspan></text>`;
+    s += G(ch, { s: cu, px: cx, py: 582, o: clamp(cu) });
+  });
+  const cl = E(lt, 2.8, 3.5);
+  s += T(960, 800 + (1 - cl) * 20, 'Desk CRM. Built on the desk, for the desk.', 56, C.tx, { a: 'middle', w: 600, op: cl });
+  const fo = E(lt, dur - 0.6, dur);
+  if (fo > 0) s += R(0, 0, 1920, 1080, 0, C.bg, `opacity="${f(fo)}"`);
+  return { svg: s };
+}
+
+/* ---------- timeline ---------- */
+const SCENES = [
+  { id: 'hook', start: 0, dur: 5, fn: sHook, cap: null },
+  { id: 'before', start: 5, dur: 9, fn: sBefore, cap: ['No more stitching together exports, spreadsheets and chats.'] },
+  { id: 'close', start: 14, dur: 11, fn: sClose, cap: ['Every VPS sends its daily close on its own.'] },
+  { id: 'status', start: 25, dur: 11, fn: sStatus, cap: ['A live status light for every account, every 10 minutes.'] },
+  { id: 'algos', start: 36, dur: 14, fn: sAlgos, cap: ['See which algorithm is running hot,', 'and which account differs from the desk.'] },
+  { id: 'reports', start: 50, dur: 10, fn: sReports, cap: ['Client reports in one click.'] },
+  { id: 'history', start: 60, dur: 9, fn: sHistory, cap: ['Every close, every account, on record.'] },
+  { id: 'book', start: 69, dur: 7.5, fn: sBook, cap: ['Each rep sees their own book.', 'Managers see the whole desk.'] },
+  { id: 'outro', start: 76.5, dur: 8, fn: sOutro, cap: null },
+];
+
+function render(t) {
+  t = clamp(t, 0, TOTAL);
+  let out = '', cur = null;
+  for (const sc of SCENES) {
+    const lt = t - sc.start;
+    if (lt < 0 || lt > sc.dur) continue;
+    const fin = sc.start === 0 ? 1 : E(lt, 0, 0.5);
+    const fout = sc.id === 'outro' ? 1 : 1 - E(lt, sc.dur - 0.5, sc.dur);
+    const a = fin * fout;
+    if (a <= 0.002) continue;
+    const r = sc.fn(lt, sc.dur);
+    out += G(r.svg, { s: 0.985 + 0.015 * a, px: 960, py: 520, o: a });
+    if (sc.cap) out += caption(sc.cap, lt, sc.dur);
+    if (r.cursor) cur = Object.assign({}, r.cursor, { op: (r.cursor.op == null ? 1 : r.cursor.op) * a });
+  }
+  const bo = E(t, 5.3, 5.9) * (1 - E(t, 75.9, 76.5));
+  if (bo > 0) out += G(logo(46) + T(62, 34, 'Desk <tspan fill="#3b82f6">CRM</tspan>', 28, C.tx, { w: 700 }), { x: 56, y: 40, o: bo * 0.85 });
+  if (cur) out += drawCursor(cur);
+  FR.innerHTML = out;
+}
+
+window.renderAt = render;
+window.TOTAL_DURATION = TOTAL;
+window.SCENES_INFO = SCENES.map(s => ({ id: s.id, start: s.start, end: s.start + s.dur, caption: s.cap ? s.cap.join(' ') : null }));
+render(0);
+if (location.hash !== '#manual') {
+  const t0 = performance.now();
+  const loop = now => { render(((now - t0) / 1000) % TOTAL); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+}
+})();
+</script>
+</body>
+</html>

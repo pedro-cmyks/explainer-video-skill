@@ -1,0 +1,29 @@
+{
+  "name": "explainer-video-skill",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A Claude Code skill and a small toolchain that turns one HTML file into an MP4 product explainer with original synthesized music and synced sound effects.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "skill",
+    "explainer-video",
+    "playwright",
+    "ffmpeg",
+    "svg-animation"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "render": "node templates/render.mjs",
+    "compose": "python3 templates/compose.py",
+    "example:render": "node templates/render.mjs --html examples/tidy-tasks/explainer.html --out examples/tidy-tasks/tidy-tasks.mp4",
+    "example:compose": "python3 examples/tidy-tasks/compose.py --html examples/tidy-tasks/explainer.html --video examples/tidy-tasks/tidy-tasks.mp4",
+    "reference:render": "node templates/render.mjs --html reference/desk-crm-explainer.html --out reference/desk-crm-explainer.mp4"
+  },
+  "dependencies": {
+    "playwright": "1.61.1"
+  }
+}

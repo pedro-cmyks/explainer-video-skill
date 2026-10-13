@@ -1,0 +1,542 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tidy Tasks Explainer</title>
+<!--
+  House style explainer template (see ../../SKILL.md).
+  * 1920x1080 SVG stage, everything drawn by a pure function of time: window.renderAt(t).
+  * Open the file directly to preview it looping in real time.
+  * Open with #manual (render.mjs does this) to disable the loop and drive frames by hand.
+  * Gold reference for the finished look: ../../reference/desk-crm-explainer.html
+-->
+<style>
+  html, body { margin: 0; background: #0f1720; overflow: hidden; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+<svg id="stage" width="1920" height="1080" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"
+     font-family="'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <defs>
+    <!-- sh: big card shadow. shs: small shadow for icons and chips. curSh: cursor. glow: soft blur for halos -->
+    <filter id="sh" x="-20%" y="-20%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#000" flood-opacity="0.42"/>
+    </filter>
+    <filter id="shs" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+    <filter id="curSh" x="-50%" y="-50%" width="220%" height="220%">
+      <feDropShadow dx="4" dy="7" stdDeviation="4" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+    <filter id="glow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+    <radialGradient id="bgGlow" cx="50%" cy="30%" r="75%">
+      <stop offset="0" stop-color="#172638"/>
+      <stop offset="0.6" stop-color="#111b26"/>
+      <stop offset="1" stop-color="#0f1720"/>
+    </radialGradient>
+    <pattern id="dots" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="20" cy="20" r="1.6" fill="#22303f"/>
+    </pattern>
+    <!-- logoG: brand gradient (logo tile, underline bar). Swap the two stops for a new brand. -->
+    <linearGradient id="logoG" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset="1" stop-color="#2fca73"/>
+    </linearGradient>
+    <linearGradient id="hotG" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f59e0b"/>
+      <stop offset="1" stop-color="#ef4444"/>
+    </linearGradient>
+    <linearGradient id="blueBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="areaG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2fca73" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#2fca73" stop-opacity="0"/>
+    </linearGradient>
+    <!-- capBand: darkens the bottom 200 px so captions always read -->
+    <linearGradient id="capBand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f1720" stop-opacity="0"/>
+      <stop offset="1" stop-color="#0b121a" stop-opacity="0.9"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bgGlow)"/>
+  <rect width="1920" height="1080" fill="url(#dots)" opacity="0.7"/>
+  <rect y="880" width="1920" height="200" fill="url(#capBand)"/>
+  <g id="frame"></g>
+</svg>
+<script>
+(function () {
+'use strict';
+
+/* =====================================================================
+   PALETTE  (house tokens, keep them; only BRAND text changes per video)
+   bg page, s1 card, s2 row/inset, bd border, tx text, mu muted text,
+   gr success/live, am warning/hot, rd loss/error, bl primary/cursor accents,
+   off inactive dot, paper/ink light document pages, purple spare accent.
+   ===================================================================== */
+const C = { bg:'#0f1720', s1:'#141d27', s2:'#1b2733', bd:'#2a3a4b', tx:'#e6edf3', mu:'#a0b1c5',
+  gr:'#2fca73', am:'#f59e0b', rd:'#ef4444', bl:'#3b82f6', off:'#3a4a5c', paper:'#f3f6fa', ink:'#1b2733', purple:'#a78bfa' };
+
+/* BRAND: placeholder product name. The second word is drawn in C.bl. Never use real client data. */
+const BRAND = { name: 'Tidy', accent: 'Tasks', tagline: 'Your list, finally done.' };
+
+/* TOTAL must stay a numeric literal (compose.py parses it) and equal the end of the last scene. */
+const TOTAL = 20;
+const FR = document.getElementById('frame');
+
+/* =====================================================================
+   MATH KIT
+   lin(t,a,b)  0..1 progress of t through [a,b], clamped
+   E(t,a,b)    cubic ease in out over [a,b]       -> default for everything
+   EO(t,a,b)   cubic ease out                      -> things settling
+   EB(t,a,b)   back ease out (overshoot ~10%)      -> pops, cards, chips, badges
+   fadeIO(t,a,b,d) fade in over [a,a+d], out over [b-d,b]   -> cursor opacity
+   mix(a,b,u)  linear interpolation
+   f(v)        round to 2 decimals for compact SVG
+   rng(seed)   deterministic PRNG (mulberry32). Never use Math.random.
+   ===================================================================== */
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lin = (t, a, b) => clamp((t - a) / (b - a));
+const eio = x => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eout = x => 1 - Math.pow(1 - x, 3);
+const eback = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const esine = x => 0.5 - 0.5 * Math.cos(Math.PI * clamp(x));
+const E = (t, a, b) => eio(lin(t, a, b));
+const EO = (t, a, b) => eout(lin(t, a, b));
+const EB = (t, a, b) => { const p = lin(t, a, b); return p <= 0 ? 0 : eback(p); };
+const mix = (a, b, u) => a + (b - a) * u;
+const f = v => Math.round(v * 100) / 100;
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const fadeIO = (t, a, b, d = 0.35) => E(t, a, a + d) * (1 - E(t, b - d, b));
+/* bob: idle float for holds, so no frame ever freezes. k de-syncs neighbours. */
+const bob = (t, k = 0, amp = 5, speed = 2) => Math.sin(t * speed + k) * amp;
+
+/* =====================================================================
+   SVG KIT  (all return SVG strings)
+   T(x,y,str,size,fill,{w,a,op,ls})  text. w weight (500 body, 600 labels, 700 titles),
+                                     a anchor start|middle|end, op opacity, ls letter spacing
+   G(inner,{x,y,s,sx,sy,r,px,py,o})  group with translate, rotate and scale about pivot (px,py), opacity o.
+                                     Returns '' when o is ~0, so hidden things cost nothing.
+   R(x,y,w,h,r,fill,extra)           rounded rect.  Ci(cx,cy,r,fill,extra) circle.
+   card(x,y,w,h)                     the house card: radius 26, C.s1, 2 px C.bd stroke, big shadow.
+   check(cx,cy,scale,color,sw)       round capped tick.
+   chip(x,y,w,h,label,color,size)    pill tag: color at 16% fill with label in color.
+   avatar(cx,cy,r,ring)              person bubble with tinted ring.
+   lock(cx,cy,s,closeU)              padlock whose shackle drops shut as closeU goes 0..1.
+   logo(size,drawU) / wordmark(x,y,size,anchor)  brand tile with tick drawn by drawU, and name.
+   textW(str,size,w)                 rendered width in px of str in the house font (canvas measureText, cached).
+                                     Size anything that follows text with it: strikes, underlines, highlight boxes,
+                                     pills (chip(x, y, textW(label, 24) + 40, 40, label, ...)). Never guess a fixed width.
+   ===================================================================== */
+const FONT = "'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+const _tw = new Map(), _twCtx = document.createElement('canvas').getContext('2d');
+function textW(str, size, w = 600) {
+  const k = `${w}|${size}|${str}`;
+  if (!_tw.has(k)) { _twCtx.font = `${w} ${size}px ${FONT}`; _tw.set(k, _twCtx.measureText(String(str)).width); }
+  return _tw.get(k);
+}
+function T(x, y, s, size, fill, o = {}) {
+  return `<text x="${f(x)}" y="${f(y)}" font-size="${size}" fill="${fill}" font-weight="${o.w || 500}" text-anchor="${o.a || 'start'}"` +
+    (o.op != null ? ` opacity="${f(clamp(o.op))}"` : '') + (o.ls ? ` letter-spacing="${o.ls}"` : '') + `>${s}</text>`;
+}
+function G(inner, o = {}) {
+  const { x = 0, y = 0, s = 1, r = 0, px = 0, py = 0 } = o;
+  const op = o.o == null ? 1 : o.o;
+  if (op <= 0.002 || !inner) return '';
+  const sx = o.sx == null ? s : o.sx, sy = o.sy == null ? s : o.sy;
+  return `<g transform="translate(${f(x + px)} ${f(y + py)}) rotate(${f(r)}) scale(${f(sx)} ${f(sy)}) translate(${f(-px)} ${f(-py)})" opacity="${f(clamp(op))}">${inner}</g>`;
+}
+function R(x, y, w, h, r, fill, ex = '') {
+  return `<rect x="${f(x)}" y="${f(y)}" width="${f(Math.max(0, w))}" height="${f(Math.max(0, h))}" rx="${r}" fill="${fill}" ${ex}/>`;
+}
+function Ci(cx, cy, r, fill, ex = '') { return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(Math.max(0, r))}" fill="${fill}" ${ex}/>`; }
+function card(x, y, w, h, ex = '') { return R(x, y, w, h, 26, C.s1, `stroke="${C.bd}" stroke-width="2" filter="url(#sh)" ${ex}`); }
+function check(cx, cy, s, color = '#fff', sw = 4) {
+  return `<path d="M${f(cx - 8 * s)} ${f(cy + 0.5 * s)} L${f(cx - 2.5 * s)} ${f(cy + 6 * s)} L${f(cx + 8.5 * s)} ${f(cy - 6 * s)}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function chip(x, y, w, h, label, color, size = 24, fillOp = 0.16) {
+  return R(x, y, w, h, h / 2, color, `fill-opacity="${fillOp}"`) + T(x + w / 2, y + h / 2 + size * 0.36, label, size, color, { a: 'middle', w: 600 });
+}
+function avatar(cx, cy, r, ring) {
+  return Ci(cx, cy, r + 6, ring, 'opacity="0.25"') + Ci(cx, cy, r, C.s2, `stroke="${ring}" stroke-width="4"`) +
+    `<clipPath id="av${Math.round(cx)}${Math.round(cy)}"><circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r - 2)}"/></clipPath>` +
+    `<g clip-path="url(#av${Math.round(cx)}${Math.round(cy)})">` + Ci(cx, cy - r * 0.18, r * 0.32, ring) +
+    `<ellipse cx="${f(cx)}" cy="${f(cy + r * 0.62)}" rx="${f(r * 0.6)}" ry="${f(r * 0.42)}" fill="${ring}"/></g>`;
+}
+function lock(cx, cy, s, closeU) {
+  const lift = (1 - closeU) * 9 * s;
+  return `<path d="M${f(cx - 9 * s)} ${f(cy - 2 * s - lift)} V${f(cy - 10 * s - lift)} A${f(9 * s)} ${f(9 * s)} 0 0 1 ${f(cx + 9 * s)} ${f(cy - 10 * s - lift)} V${f(cy - 2 * s - lift * 0.2)}" fill="none" stroke="${C.mu}" stroke-width="${f(4 * s)}" stroke-linecap="round"/>` +
+    R(cx - 14 * s, cy - 3 * s, 28 * s, 22 * s, 6 * s, C.mu) + Ci(cx, cy + 7 * s, 3 * s, C.s1);
+}
+function logo(size, drawU = 1) {
+  const s = size / 120;
+  return R(0, 0, size, size, 30 * s, 'url(#logoG)') +
+    `<path d="M${f(32 * s)} ${f(42 * s)} L${f(58 * s)} ${f(84 * s)} L${f(90 * s)} ${f(32 * s)}" fill="none" stroke="#fff" stroke-width="${f(13 * s)}" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${f(1 - drawU)}"/>`;
+}
+function wordmark(x, y, size, anchor = 'middle') {
+  return `<text x="${f(x)}" y="${f(y)}" font-size="${size}" font-weight="700" text-anchor="${anchor}" fill="${C.tx}" letter-spacing="${f(-size * 0.01)}">${BRAND.name} <tspan fill="${C.bl}">${BRAND.accent}</tspan></text>`;
+}
+
+/* =====================================================================
+   CHART KIT
+   pathFrom(pts,u)        polyline drawn to fraction u; returns {d, head:[x,y]} so a glowing dot rides the tip.
+   walk(seed,n,drift,vol) deterministic random walk values.
+   scalePts(vals,x0,y0,w,h,lo,hi)  values -> points inside a box (shared lo/hi for multi series).
+   spark(x,y,w,h,seed,u,color,sw)  small sparkline drawn to u.
+   areaChart(pts,u,baseY,color)    line + gradient area + glowing head dot (the house "chart draws" move).
+   bez(p0,p1,p2,p3,u)     cubic bezier point (packets).
+   ===================================================================== */
+function pathFrom(pts, u = 1) {
+  const n = pts.length - 1, fi = clamp(u) * n, i = Math.floor(fi);
+  let d = `M${f(pts[0][0])} ${f(pts[0][1])}`;
+  for (let k = 1; k <= Math.min(i, n); k++) d += ` L${f(pts[k][0])} ${f(pts[k][1])}`;
+  let head = pts[Math.min(i, n)];
+  if (i < n) {
+    const fr = fi - i, a = pts[i], b = pts[i + 1];
+    head = [mix(a[0], b[0], fr), mix(a[1], b[1], fr)];
+    d += ` L${f(head[0])} ${f(head[1])}`;
+  }
+  return { d, head };
+}
+function walk(seed, n, drift, vol) {
+  const r = rng(seed); let v = 0; const out = [0];
+  for (let i = 1; i < n; i++) { v += drift + (r() - 0.5) * vol; out.push(v); }
+  return out;
+}
+function scalePts(vals, x0, y0, w, h, lo, hi) {
+  const mn = lo == null ? Math.min(...vals) : lo, mx = hi == null ? Math.max(...vals) : hi;
+  return vals.map((v, i) => [x0 + w * i / (vals.length - 1), y0 + h - h * (v - mn) / ((mx - mn) || 1)]);
+}
+function spark(x, y, w, h, seed, u, color, sw = 4) {
+  if (u <= 0.01) return '';
+  const vals = walk(seed, 16, 0.25, 1.6);
+  const p = pathFrom(scalePts(vals, x, y, w, h), u);
+  return `<path d="${p.d}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/>`;
+}
+function areaChart(pts, u, baseY, color = C.gr, sw = 6) {
+  if (u <= 0) return '';
+  const pp = pathFrom(pts, u);
+  return `<path d="${pp.d} L${f(pp.head[0])} ${baseY} L${f(pts[0][0])} ${baseY} Z" fill="url(#areaG)"/>` +
+    `<path d="${pp.d}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/>` +
+    Ci(pp.head[0], pp.head[1], 18, color, 'filter="url(#glow)"') + Ci(pp.head[0], pp.head[1], 10, '#fff');
+}
+function bez(p0, p1, p2, p3, u) {
+  const v = 1 - u;
+  return [v * v * v * p0[0] + 3 * v * v * u * p1[0] + 3 * v * u * u * p2[0] + u * u * u * p3[0],
+    v * v * v * p0[1] + 3 * v * v * u * p1[1] + 3 * v * u * u * p2[1] + u * u * u * p3[1]];
+}
+
+/* =====================================================================
+   MOTION KIT
+   ring(cx,cy,lt,t0,color,r0,grow,dur)  one expanding ring burst (arrival, status change, ding).
+   statusDot(cx,cy,lt,onT,state,k)      grey -> live dot with ring burst, pop and breathing glow.
+                                        state: 'off' | 'on' | 'warn' (warn = amber, repeating ring, short shake).
+   packet(p0,p3,lt,t0,t1,{bend})        glowing packet along an S curve with a 6 dot comet tail,
+                                        a flowing dashed guide line and a green ring on arrival.
+   progressRing(cx,cy,r,u,color,sw,glow) track in C.bd plus an arc from 12 o'clock filled to u (0..1), round caps.
+                                        Ease u per arrival (EO over 0.5 s). glow 0..1 breathes under the arc once it
+                                        closes (pass 0.25 + 0.2 * sin(3 lt)); add ring() on the closing frame.
+   checkbox(cx,cy,lt,t,r)               round check: empty C.bd ring, dips on the click at t, fills green (EB pop
+                                        0.7 -> 1), tick draws over t+0.05..t+0.4, green ring burst.
+   strike(x,y,w,u,color)                strikethrough drawn left to right to u. Pass w = textW(label, size, weight).
+   ===================================================================== */
+function ring(cx, cy, lt, t0, color, r0 = 10, grow = 30, dur = 0.5) {
+  const p = lin(lt, t0, t0 + dur);
+  if (p <= 0 || p >= 1) return '';
+  return Ci(cx, cy, r0 + grow * eout(p), 'none', `stroke="${color}" stroke-width="4" opacity="${f(1 - p)}"`);
+}
+function statusDot(cx, cy, lt, onT, state = 'on', k = 0) {
+  const on = state !== 'off' && lt >= onT, warn = state === 'warn' && on;
+  const color = warn ? C.am : on ? C.gr : C.off;
+  const lp = lin(lt, onT, onT + 0.6);
+  let s = '';
+  if (on && lp < 1) s += Ci(cx, cy, 14 + 26 * eout(lp), 'none', `stroke="${color}" stroke-width="4" opacity="${f(1 - lp)}"`);
+  if (warn) { const ap = ((lt - onT) % 1.3) / 1.3; s += Ci(cx, cy, 14 + 24 * eout(ap), 'none', `stroke="${C.am}" stroke-width="4" opacity="${f(0.9 * (1 - ap))}"`); }
+  if (on) s += Ci(cx, cy, 20, color, `filter="url(#glow)" opacity="${f(warn ? 0.6 : 0.25 + 0.2 * Math.sin(lt * 3 + k))}"`);
+  const shake = warn ? Math.sin((lt - onT) * 40) * 5 * (1 - lin(lt, onT, onT + 0.6)) : 0;
+  return s + Ci(cx + shake, cy, 14 * (on ? 1 + 0.25 * Math.sin(Math.PI * lp) : 1), color);
+}
+function packet(p0, p3, lt, t0, t1, o = {}) {
+  const bend = o.bend == null ? 0.45 : o.bend, dx = p3[0] - p0[0];
+  const p1 = [p0[0] + dx * bend, p0[1]], p2 = [p3[0] - dx * bend, p3[1]];
+  let s = '';
+  const lo = E(lt, t0 - 0.1, t0 + 0.3), gu = E(lt, t1, t1 + 0.8);
+  if (lo > 0) s += `<path d="M${f(p0[0])} ${f(p0[1])} C${f(p1[0])} ${f(p1[1])} ${f(p2[0])} ${f(p2[1])} ${f(p3[0])} ${f(p3[1])}" fill="none" stroke="${gu > 0.5 ? C.gr : C.bl}" stroke-width="3" stroke-dasharray="4 10" stroke-dashoffset="${f(-lt * 24)}" opacity="${f(lo * mix(0.45, 0.3, gu))}"/>`;
+  if (lt >= t0 && lt <= t1) {
+    const u = eio((lt - t0) / (t1 - t0));
+    for (let k = 6; k >= 1; k--) {
+      const [tx, ty] = bez(p0, p1, p2, p3, clamp(u - k * 0.025));
+      s += Ci(tx, ty, 11 * (1 - k / 7), '#93c5fd', `opacity="${f(0.6 * (1 - k / 7))}"`);
+    }
+    const [hx, hy] = bez(p0, p1, p2, p3, u);
+    s += Ci(hx, hy, 22, C.bl, 'filter="url(#glow)" opacity="0.9"') + Ci(hx, hy, 12, '#dbeafe');
+  }
+  return s + ring(p3[0], p3[1], lt, t1, C.gr, 10, 30, 0.5);
+}
+function progressRing(cx, cy, r, u, color = C.gr, sw = 28, glow = 0) {
+  let s = Ci(cx, cy, r, 'none', `stroke="${C.bd}" stroke-width="${sw}"`);
+  if (glow > 0) s += Ci(cx, cy, r, 'none', `stroke="${color}" stroke-width="${f(sw * 1.4)}" filter="url(#glow)" opacity="${f(glow)}"`);
+  if (u > 0.002) s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" pathLength="1" stroke-dasharray="${f(clamp(u))} 1" transform="rotate(-90 ${f(cx)} ${f(cy)})"/>`;
+  return s;
+}
+function checkbox(cx, cy, lt, t, r = 20) {
+  const on = lt >= t, cu = EB(lt, t, t + 0.5), du = E(lt, t + 0.05, t + 0.4), k = r / 20;
+  let b = Ci(cx, cy, r, 'none', `stroke="${on ? C.gr : C.bd}" stroke-width="3"`);
+  if (on) b += G(Ci(cx, cy, r, C.gr), { s: mix(0.7, 1, cu), px: cx, py: cy, o: clamp(cu) }) +
+    `<path d="M${f(cx - 9 * k)} ${f(cy + k)} L${f(cx - 3 * k)} ${f(cy + 7 * k)} L${f(cx + 9 * k)} ${f(cy - 6 * k)}" fill="none" stroke="#fff" stroke-width="${f(4 * k)}" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${f(1 - du)}"/>`;
+  return G(b, { s: 1 - 0.07 * press(lt, t), px: cx, py: cy }) + ring(cx, cy, lt, t, C.gr, r, 26, 0.6);
+}
+function strike(x, y, w, u, color = C.mu) { return u > 0 ? R(x, y - 1.5, w * clamp(u), 3, 1.5, color) : ''; }
+
+/* =====================================================================
+   CURSOR KIT
+   keys: [[t, x, y], ...] in scene local seconds. (x, y) is the arrow TIP.
+     Glide between keys uses cubic ease in out plus a sideways arc (12% of the distance, max 110 px).
+     Repeat a position on two consecutive keys to hold. Enter from off frame (1880,1080), exit to a quiet corner.
+     Rest spots keep the tip at y <= 800: the 1.1x arrow and its shadow reach ~75 px below the tip,
+     and the caption band (y >= 880) stays clear.
+   clicks: [t, ...]  squash (x +16%, y -22%) peaking right on t, then a blue ring + 8 white/yellow spokes for 0.6 s.
+     Rule: the arrival key must be at least 0.15 s before the click.
+   trail: [t0, t1] optional blue comet trail while drawing (lasso style moves).
+   pos: optional function lt -> [x, y] to replace keys (custom paths such as a lasso).
+   op: opacity, normally fadeIO(lt, firstKey, lastUse, 0.35).
+   Tilt follows horizontal velocity (max 14 deg). Base scale 1.1.
+   ===================================================================== */
+const ARROW = 'M0 0 L0 50 L13 38.5 L22.5 58 L31 54 L21.8 34.8 L38 34.8 Z';
+function curPos(keys, lt) {
+  if (lt <= keys[0][0]) return [keys[0][1], keys[0][2]];
+  for (let i = 0; i < keys.length - 1; i++) {
+    const [t0, x0, y0] = keys[i], [t1, x1, y1] = keys[i + 1];
+    if (lt < t1) {
+      const u = eio((lt - t0) / (t1 - t0)), dx = x1 - x0, dy = y1 - y0, d = Math.hypot(dx, dy);
+      const arc = Math.sin(Math.PI * u) * Math.min(d * 0.12, 110);
+      const nx = d ? -dy / d : 0, ny = d ? dx / d : 0;
+      return [x0 + dx * u + nx * arc, y0 + dy * u + ny * arc];
+    }
+  }
+  const k = keys[keys.length - 1]; return [k[1], k[2]];
+}
+function drawCursor(c) {
+  const { keys, clicks = [], lt, op = 1, trail } = c;
+  if (op <= 0.01) return '';
+  const P = c.pos || (v => curPos(keys, v));
+  const [x, y] = P(lt);
+  let s = '';
+  if (trail && lt > trail[0] && lt < trail[1]) {
+    const tf = Math.min(E(lt, trail[0], trail[0] + 0.2), 1 - E(lt, trail[1] - 0.2, trail[1]));
+    for (let k = 12; k >= 1; k--) {
+      const [px, py] = P(lt - k * 0.022);
+      s += Ci(px + 4, py + 6, 10 * (1 - k / 13), C.bl, `opacity="${f(0.35 * (1 - k / 13) * tf * op)}"`);
+    }
+  }
+  for (const tc of clicks) {
+    const u = (lt - tc) / 0.6;
+    if (u < 0 || u > 1) continue;
+    const [bx, by] = P(tc), e = eout(u);
+    s += Ci(bx, by, 8 + 46 * e, 'none', `stroke="${C.bl}" stroke-width="${f(5 * (1 - u) + 1)}" opacity="${f((1 - u) * 0.9 * op)}"`);
+    for (let k = 0; k < 8; k++) {
+      const a = k * Math.PI / 4 + Math.PI / 8, r1 = 20 + 34 * e, r2 = r1 + 18 * (1 - u) + 4;
+      s += `<line x1="${f(bx + Math.cos(a) * r1)}" y1="${f(by + Math.sin(a) * r1)}" x2="${f(bx + Math.cos(a) * r2)}" y2="${f(by + Math.sin(a) * r2)}" stroke="${k % 2 ? '#ffd166' : '#ffffff'}" stroke-width="5" stroke-linecap="round" opacity="${f((1 - u) * op)}"/>`;
+    }
+  }
+  let b = 0;
+  for (const tc of clicks) { const u = (lt - tc + 0.1) / 0.34; if (u > 0 && u < 1) b = Math.max(b, Math.sin(Math.PI * u)); }
+  const [qx] = P(lt - 1 / 30);
+  const tilt = clamp((x - qx) * 0.35, -14, 14);
+  const sx = 1.1 * (1 + 0.16 * b), sy = 1.1 * (1 - 0.22 * b);
+  s += `<g transform="translate(${f(x)} ${f(y)}) rotate(${f(tilt)}) scale(${f(sx)} ${f(sy)})" opacity="${f(op)}"><path d="${ARROW}" fill="#ffffff" stroke="#0b1118" stroke-width="3.4" stroke-linejoin="round" filter="url(#curSh)"/></g>`;
+  return s;
+}
+/* press(lt, click): 0..1..0 bump for the clicked control (scale it by 1 - 0.07 * press). */
+const press = (lt, tc) => Math.sin(Math.PI * lin(lt, tc - 0.05, tc + 0.3));
+
+/* =====================================================================
+   CAPTION
+   Centered, 50 px, weight 600, C.tx, over the dark bottom band. One line at y 988, two lines at 952 / 1016.
+   Fades and rises 26 px in over 0.45..1.05 s, fades out over dur-0.75..dur-0.25.
+   Max ~48 characters per line. English. No dashes as punctuation.
+   ===================================================================== */
+function caption(lines, lt, dur) {
+  const a = E(lt, 0.45, 1.05) * (1 - E(lt, dur - 0.75, dur - 0.25));
+  const dy = (1 - E(lt, 0.45, 1.05)) * 26;
+  let s = '';
+  const ys = lines.length === 1 ? [988] : [952, 1016];
+  lines.forEach((ln, i) => { s += T(960, ys[i] + dy, ln, 50, C.tx, { a: 'middle', w: 600, op: a }); });
+  return s;
+}
+
+/* =====================================================================
+   SCENES
+   Each scene is fn(lt, dur) -> { svg, cursor? } where lt is local time (0 at scene start).
+   Pure: output depends only on lt. No state, no Date, no Math.random.
+   Layout zone: content lives in y 120..860; the caption band owns y 880..1080;
+   the brand bug owns the top left corner (56,40) to (330,90).
+   ===================================================================== */
+
+/* 1. Title: logo pops (EB), tick draws, wordmark wipes open from the centre, tagline rises, gradient bar grows. */
+function sTitle(lt) {
+  let s = '';
+  const ls = EB(lt, 0.25, 0.95);
+  s += G(logo(150, E(lt, 0.7, 1.35)), { x: 885, y: 230 + bob(lt, 0, 3, 1.4) * E(lt, 1.4, 2), s: ls, px: 75, py: 75, o: E(lt, 0.25, 0.6) });
+  const wu = E(lt, 0.9, 1.7);
+  s += `<clipPath id="wmc"><rect x="${f(960 - 520 * wu)}" y="400" width="${f(1040 * wu)}" height="190"/></clipPath>`;
+  s += `<g clip-path="url(#wmc)">` + G(wordmark(960, 545, 132), { y: (1 - wu) * 34, o: wu }) + `</g>`;
+  const lu = E(lt, 2.0, 2.7);
+  s += T(960, 655 + (1 - lu) * 24, BRAND.tagline, 58, C.mu, { a: 'middle', w: 500, op: lu });
+  const bu = E(lt, 2.5, 3.3);
+  s += R(960 - 140 * bu, 700, 280 * bu, 8, 4, 'url(#logoG)', `opacity="${f(bu)}"`);
+  return { svg: s };
+}
+
+/* 2. Tasks: the cursor checks off three tasks; each check sends a packet across the middle and the
+      progress ring fills one third per arrival; an "All done" badge pops when the ring closes. Fictional data. */
+const TASKS = [['Reply to Northwind', 'Work'], ['Book the team lunch', 'Team'], ['Send the weekly recap', 'Work']];
+function sTasks(lt, dur) {
+  let s = '';
+  const clicks = [2.8, 3.85, 4.9];                 // cursor arrives 0.2 s before each click
+  const send = i => clicks[i] + 0.15, arrive = i => send(i) + 1.2;
+  const doneT = arrive(2) + 0.5;
+  const rowY = i => 320 + i * 100, boxX = 284, boxY = i => rowY(i) + 40;
+
+  // left card: today's list
+  const got = [0, 1, 2].filter(i => lt >= clicks[i]).length;
+  let p = card(200, 210, 760, 550);
+  p += T(240, 276, 'Today', 36, C.tx, { w: 700 });
+  p += T(920, 274, `${got} of ${TASKS.length} done`, 26, got === TASKS.length ? C.gr : C.mu, { a: 'end', w: 600 });
+  TASKS.forEach(([n, tag], i) => {
+    const y = rowY(i), u = E(lt, 0.3 + i * 0.1, 0.8 + i * 0.1), c = clicks[i];
+    const on = lt >= c, su = E(lt, c + 0.1, c + 0.55);
+    const flash = Math.max(0, 1 - Math.abs(lt - send(i)) / 0.35);
+    let r = R(230, y, 700, 80, 18, C.s2, flash > 0 ? `stroke="${C.gr}" stroke-width="3" stroke-opacity="${f(flash)}"` : '');
+    r += checkbox(boxX, boxY(i), lt, c);
+    r += T(324, y + 50, n, 28, on ? C.mu : C.tx, { w: 600 });
+    r += strike(320, y + 41.5, textW(n, 28, 600) + 8, su);
+    r += chip(800, y + 20, 104, 40, tag, C.bl, 24);
+    p += G(r, { x: (1 - u) * -20, o: u });
+  });
+  const au = E(lt, 0.6, 1.1);
+  p += G(R(230, 620, 700, 80, 18, 'none', `stroke="${C.bd}" stroke-width="2" stroke-dasharray="10 8"`) +
+    T(284, 671, '+', 34, C.mu, { a: 'middle', w: 600 }) + T(324, 670, 'Add a task', 28, C.mu, { w: 600 }), { o: au * 0.8 });
+  s += G(p, { o: E(lt, 0, 0.5), y: (1 - E(lt, 0, 0.6)) * 20 });
+
+  // right card: progress ring fills one third per arrival
+  const ru = EB(lt, 0.6, 1.3);
+  const prog = [0, 1, 2].reduce((a, i) => a + EO(lt, arrive(i), arrive(i) + 0.5), 0) / 3;
+  const landed = [0, 1, 2].filter(i => lt >= arrive(i)).length;
+  const cx = 1390, cy = 480, rr = 140, full = lt >= doneT - 0.5;
+  let q = card(1060, 210, 660, 550);
+  q += T(1100, 276, 'Progress', 36, C.tx, { w: 700 });
+  q += progressRing(cx, cy, rr, prog, C.gr, 28, full ? 0.25 + 0.2 * Math.sin(lt * 3) : 0);
+  q += `<text x="${cx}" y="${cy + 22}" text-anchor="middle" font-size="64" font-weight="700" fill="${C.tx}" style="font-variant-numeric: tabular-nums">${Math.round(prog * 100)}%</text>`;
+  q += T(cx, 700, `${landed} of ${TASKS.length} tasks`, 28, landed === TASKS.length ? C.gr : C.mu, { a: 'middle', w: 600 });
+  q += ring(cx, cy, lt, doneT - 0.5, C.gr, rr, 40, 0.7);
+  s += G(q, { s: mix(0.92, 1, ru), px: 1390, py: 480, o: E(lt, 0.6, 1.1), y: bob(lt, 1, 3, 1.3) * E(lt, doneT, doneT + 0.6) });
+
+  // packets across the middle: each checked row sends one to the ring
+  for (let i = 0; i < TASKS.length; i++) s += packet([930, boxY(i)], [cx - rr, cy], lt, send(i), arrive(i));
+
+  // confirmation badge (top centre, clear of the caption band)
+  const bu = EB(lt, doneT, doneT + 0.6), bl = 'All done today', bw = textW(bl, 26, 700) + 96, bx = -bw / 2;
+  s += G(R(bx, -28, bw, 56, 28, C.bg) + R(bx, -28, bw, 56, 28, C.gr, 'fill-opacity="0.16"') + Ci(bx + 34, 0, 15, C.gr) + check(bx + 34, 0, 0.75, '#fff', 3.5) +
+    T(bx + 64, 9, bl, 26, C.gr, { w: 700 }), { x: 960, y: 150, s: mix(0.7, 1, bu), o: clamp(bu) });
+
+  return {
+    svg: s, cursor: {
+      keys: [[1.5, 1880, 1080], [2.6, boxX, boxY(0)], [2.95, boxX, boxY(0)], [3.65, boxX, boxY(1)], [4.0, boxX, boxY(1)],
+        [4.7, boxX, boxY(2)], [5.05, boxX, boxY(2)], [6.3, 1010, 800], [dur, 1010, 800]],
+      clicks, lt, op: fadeIO(lt, 1.5, dur - 0.6, 0.35)
+    }
+  };
+}
+/* 3. Outro: logo + wordmark, three pills, closing line, fade to bg.
+   STATS entries are either [n, 'label'] (counts up with ease out quint; true numbers from the user or the product only)
+   or plain words (pops, no counter) for teasers and products without true numbers, e.g.
+   STATS = ['Simple lists', 'Daily focus', 'Clear progress']
+   Keep the declaration on one line at the start of a line: compose.py reads it to place count ticks or pops. */
+const STATS = ['Simple lists', 'Daily focus', 'Clear progress'];   // no true numbers for a fictional product, so word pills
+function sOutro(lt, dur) {
+  let s = '';
+  const lu = EB(lt, 0.15, 0.8);
+  s += G(logo(120, E(lt, 0.4, 1.0)), { x: 900, y: 190, s: lu, px: 60, py: 60, o: clamp(lu) });
+  const wu = E(lt, 0.5, 1.1);
+  s += G(wordmark(960, 440, 96), { y: (1 - wu) * 24, o: wu });
+  STATS.forEach((st, i) => {
+    const cx = 520 + i * 440, t0 = 1.1 + i * 0.2;
+    const cu = EB(lt, t0, t0 + 0.6), dot = [C.bl, C.gr, C.am][i % 3];
+    // dot + content centred as one group (measured with textW at the final value), pill sized to fit
+    const word = typeof st === 'string';
+    const cw = word ? textW(st, 34, 600) : textW(String(st[0]), 62, 700) + 14 + textW(st[1], 34, 600);
+    const gw = 20 + 18 + cw, x0 = cx - gw / 2, pw = clamp(gw + 88, 300, 420);
+    let ch = R(cx - pw / 2, 520, pw, 124, 62, C.s1, `stroke="${C.bd}" stroke-width="2" filter="url(#sh)"`) + Ci(x0 + 10, 582, 10, dot);
+    if (word) ch += T(x0 + 38, 594, st, 34, C.tx, { w: 600 });            // word pill: pops, no counter
+    else {                                                                // counter: [n, label], ease out quint
+      const [n, l] = st, cnt = lin(lt, t0, t0 + 1.0), num = Math.round(n * (1 - Math.pow(1 - cnt, 5)));
+      ch += `<text x="${f(x0 + 38)}" y="604" style="font-variant-numeric: tabular-nums" font-weight="700" font-size="62" fill="${C.tx}">${num}<tspan dx="14" font-size="34" font-weight="600" fill="${C.mu}">${l}</tspan></text>`;
+    }
+    s += G(ch, { s: cu, px: cx, py: 582, o: clamp(cu), y: bob(lt, i * 1.7, 3, 1.5) * E(lt, t0 + 1, t0 + 1.5) });
+  });
+  const cl = E(lt, 2.8, 3.5);
+  s += T(960, 800 + (1 - cl) * 20, `${BRAND.name} ${BRAND.accent}. Finish the day lighter.`, 56, C.tx, { a: 'middle', w: 600, op: cl });
+  const fo = E(lt, dur - 0.6, dur);
+  if (fo > 0) s += R(0, 0, 1920, 1080, 0, C.bg, `opacity="${f(fo)}"`);
+  return { svg: s };
+}
+
+/* ================= ADD SCENES HERE =================
+   1. Write function sYourScene(lt, dur) { ...; return { svg, cursor }; } above this block.
+   2. Insert it in SCENES between the title and the outro. Scenes are back to back:
+      next.start = prev.start + prev.dur. Update the following starts and TOTAL.
+   3. cap: null or 1..2 lines. Scene dur >= max(2.5, words / 4) + ~1.5 s of action.
+   Keep the line shape { id: 'x', start: N, dur: N, ... } on one line: compose.py parses it.
+   ==================================================== */
+const SCENES = [
+  { id: 'title', start: 0, dur: 4.5, fn: sTitle, cap: null },
+  { id: 'tasks', start: 4.5, dur: 9.5, fn: sTasks, cap: ['Check off a task and watch your day fill up.'] },
+  { id: 'outro', start: 14, dur: 6, fn: sOutro, cap: null },
+];
+{ const last = SCENES[SCENES.length - 1]; if (Math.abs(last.start + last.dur - TOTAL) > 1e-6) console.warn('TOTAL does not match the end of the last scene'); }
+
+/* ---------- timeline ----------
+   Transition: each scene fades out over its last 0.5 s and the next fades in over its first 0.5 s
+   (a dip through the background, with a 0.985 -> 1 scale settle). The first scene starts solid,
+   the last one ends with its own fade to C.bg. Brand bug shows from the 2nd scene to the outro. */
+function render(t) {
+  t = clamp(t, 0, TOTAL);
+  let out = '', cur = null;
+  const lastId = SCENES[SCENES.length - 1].id;
+  for (const sc of SCENES) {
+    const lt = t - sc.start;
+    if (lt < 0 || lt > sc.dur) continue;
+    const fin = sc.start === 0 ? 1 : E(lt, 0, 0.5);
+    const fout = sc.id === lastId ? 1 : 1 - E(lt, sc.dur - 0.5, sc.dur);
+    const a = fin * fout;
+    if (a <= 0.002) continue;
+    const r = sc.fn(lt, sc.dur);
+    out += G(r.svg, { s: 0.985 + 0.015 * a, px: 960, py: 520, o: a });
+    if (sc.cap) out += caption(sc.cap, lt, sc.dur);
+    if (r.cursor) cur = Object.assign({}, r.cursor, { op: (r.cursor.op == null ? 1 : r.cursor.op) * a });
+  }
+  const bugIn = SCENES[1].start, bugOut = SCENES[SCENES.length - 1].start;
+  const bo = E(t, bugIn + 0.3, bugIn + 0.9) * (1 - E(t, bugOut - 0.6, bugOut));
+  if (bo > 0) out += G(logo(46) + T(62, 34, `${BRAND.name} <tspan fill="${C.bl}">${BRAND.accent}</tspan>`, 28, C.tx, { w: 700 }), { x: 56, y: 40, o: bo * 0.85 });
+  if (cur) out += drawCursor(cur);   // cursor always drawn last, above everything
+  FR.innerHTML = out;
+}
+
+window.renderAt = render;
+window.TOTAL_DURATION = TOTAL;
+window.SCENES_INFO = SCENES.map(s => ({ id: s.id, start: s.start, end: s.start + s.dur, caption: s.cap ? s.cap.join(' ') : null }));
+render(0);
+if (location.hash !== '#manual') {
+  const t0 = performance.now();
+  const loop = now => { render(((now - t0) / 1000) % TOTAL); requestAnimationFrame(loop); };
+  requestAnimationFrame(loop);
+}
+})();
+</script>
+</body>
+</html>

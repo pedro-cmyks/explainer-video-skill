@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# renders: videos stay local, except the demo assets
+*.mp4
+!assets/*.mp4
+
+# work folders written by render.mjs, compose.py and voiceover.sh
+audio/
+critique/
+frames/
+stills/
+
+# render side outputs next to a video (the committed contact sheets are listed explicitly)
+*-poster.png
+*-contact.png
+!examples/tidy-tasks/tidy-tasks-contact.png
+
+.DS_Store
