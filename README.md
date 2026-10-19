@@ -124,6 +124,7 @@ node templates/apply-theme.mjs --theme studio --html explainer.html
 | `house` | navy | blue | check | Avenir Next | D major, I V vi IV, 104 BPM |
 | `studio` | violet | violet | ring | Futura | A major, vi IV I V, 125 BPM |
 | `ember` | charcoal | orange | bolt | Georgia | F major, IV I V vi, 96 BPM |
+| `tide` | teal | teal | wave | Gill Sans | C major, I vi IV V, 110 BPM |
 
 To make one, copy a json, change the values, keep `gr`, `am` and `rd` readable as green, amber and red (they carry meaning), use a font that exists on the machine that renders, and read the contact sheet for contrast. `compose.py` reads the music settings from the `THEME` block in the HTML, so the HTML is the single source of truth for a video.
 
@@ -160,7 +161,7 @@ templates/
   compose.py              music bed and synced effects, mastered and muxed
   voiceover.sh            optional macOS voiceover
   apply-theme.mjs         stamps a theme from themes/ into a video's HTML
-themes/                   house, studio, ember: palette, font, mark and music per theme
+themes/                   house, studio, ember, tide: palette, font, mark and music per theme
 reference/
   desk-crm-explainer.html full reference video, fictional data
   contact.png             its contact sheet

@@ -1,0 +1,76 @@
+{
+  "name": "tide",
+  "font": "'Gill Sans', 'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+  "colors": {
+    "bg": "#0e1a1a",
+    "s1": "#13211f",
+    "s2": "#1a2c29",
+    "bd": "#2a4541",
+    "tx": "#e8f4f1",
+    "mu": "#9fc3bb",
+    "gr": "#4ade80",
+    "am": "#fbbf24",
+    "rd": "#f87171",
+    "bl": "#2dd4bf",
+    "off": "#3d5a55",
+    "paper": "#f1faf8",
+    "ink": "#1a2c29",
+    "purple": "#a78bfa",
+    "light": "#99f6e4",
+    "core": "#ecfeff",
+    "spark": "#fde68a"
+  },
+  "gradients": {
+    "bgGlow": [
+      "#16302c",
+      "#10201e",
+      "#0e1a1a"
+    ],
+    "dots": "#22403b",
+    "logo": [
+      "#2dd4bf",
+      "#60a5fa"
+    ],
+    "bar": [
+      "#14b8a6",
+      "#2dd4bf"
+    ],
+    "hot": [
+      "#fbbf24",
+      "#f87171"
+    ],
+    "capBand": "#0a1414"
+  },
+  "shape": {
+    "card": 22
+  },
+  "mark": "wave",
+  "music": {
+    "transpose": -2,
+    "prog": [
+      "I",
+      "vi",
+      "IV",
+      "V"
+    ],
+    "bpm": 110,
+    "arp": [
+      0,
+      1,
+      3,
+      2,
+      0,
+      1,
+      3,
+      2,
+      0,
+      2,
+      3,
+      1,
+      0,
+      2,
+      3,
+      1
+    ]
+  }
+}

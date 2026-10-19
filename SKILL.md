@@ -15,7 +15,7 @@ Files in this skill:
 |---|---|
 | `templates/explainer-template.html` | Start here. Full helper kit plus 3 example scenes (title, cards with cursor click, outro). |
 | `templates/apply-theme.mjs` | Stamps a theme from `themes/` into a video's HTML (`--theme studio --html explainer.html`, `--list`). Run in place. |
-| `themes/*.json` | Look and sound per theme: colours, gradients, font, card radius, logo mark, music key, progression, tempo, arpeggio. `house` is the default. |
+| `themes/*.json` | Look and sound per theme (`house`, `studio`, `ember`, `tide`): colours, gradients, font, card radius, logo mark, music key, progression, tempo, arpeggio. `house` is the default. |
 | `templates/render.mjs` | Playwright frame stepper piped to ffmpeg. Video, poster, contact sheet, stills. Run in place, never copied. |
 | `templates/compose.py` | Numpy music bed plus SFX synced to scene local times, mastered and muxed. Copy it per video. |
 | `templates/voiceover.sh` | Optional macOS `say` voiceover, ducked under the music. Run in place with arguments. |
@@ -31,7 +31,7 @@ Setup, once per machine: `npm install` and `npx playwright install chromium` in 
 One motion language, many looks. Everything below describes the default theme, `house`. A theme changes the
 palette tokens, the gradients, the font, the card radius, the logo mark and the music; it never changes the motion,
 the cursor, the captions or the checklist. Same theme plus same scenes gives the same video, frame for frame.
-Themes live in `themes/*.json` (`house`, `studio`, `ember`); `node $SK/apply-theme.mjs --list` shows them, and
+Themes live in `themes/*.json` (`house`, `studio`, `ember`, `tide`); `node $SK/apply-theme.mjs --list` shows them, and
 `--theme <name> --html explainer.html` stamps one into the `THEME` block at the top of the HTML. `compose.py` reads
 the music settings from that same block. The brief names the theme; without one, use `house`. For a new theme, copy a
 json, change the tokens, keep `gr`, `am` and `rd` recognisable as green, amber and red, pick a font that exists on
@@ -176,7 +176,7 @@ after the last beat of a scene so the caption finishes reading.
 ## Workflow
 
 1. Brief. Audience, product, 3..6 true claims with real numbers, length (60..90 s full, 20..40 s teaser), where it will post,
-   and the theme (`house`, `studio`, `ember`, or a new json).
+   and the theme (`house`, `studio`, `ember`, `tide`, or a new json).
 2. Storyboard. A table with scene id, duration, caption, visual metaphor, cursor action and beat times.
    Arc: hook (logo, tagline) -> before (the pain) -> one feature per scene -> outro (stats or word pills, closing line).
    Check caption timing against the copy rules before building.
