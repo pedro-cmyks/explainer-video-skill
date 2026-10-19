@@ -12,7 +12,8 @@ Write down what failed, fix it in the HTML, re-render, and check again.
       including the resting cursor (tip at y <= 800).
 - [ ] One idea per scene; at most two main cards plus one detail card.
 - [ ] Cards, rows and chips use the house tokens (radius 26 cards, s1 / s2 / bd, shadows). No stray colours.
-- [ ] Semantic colour holds: green done or live, amber attention, red loss only, blue action.
+- [ ] Semantic colour holds: green done or live, amber attention, red loss only, the theme's action colour for buttons and cursor.
+- [ ] One theme throughout: no hex literals in the scenes that belong to another theme (use the `C` tokens); the logo mark, font and gradients match `THEME`.
 
 ## Cursor
 - [ ] The arrow tip lands exactly on the control it clicks (check a still at the click time).

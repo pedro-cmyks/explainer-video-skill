@@ -1,0 +1,76 @@
+{
+  "name": "house",
+  "font": "'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+  "colors": {
+    "bg": "#0f1720",
+    "s1": "#141d27",
+    "s2": "#1b2733",
+    "bd": "#2a3a4b",
+    "tx": "#e6edf3",
+    "mu": "#a0b1c5",
+    "gr": "#2fca73",
+    "am": "#f59e0b",
+    "rd": "#ef4444",
+    "bl": "#3b82f6",
+    "off": "#3a4a5c",
+    "paper": "#f3f6fa",
+    "ink": "#1b2733",
+    "purple": "#a78bfa",
+    "light": "#93c5fd",
+    "core": "#dbeafe",
+    "spark": "#ffd166"
+  },
+  "gradients": {
+    "bgGlow": [
+      "#172638",
+      "#111b26",
+      "#0f1720"
+    ],
+    "dots": "#22303f",
+    "logo": [
+      "#3b82f6",
+      "#2fca73"
+    ],
+    "bar": [
+      "#2563eb",
+      "#3b82f6"
+    ],
+    "hot": [
+      "#f59e0b",
+      "#ef4444"
+    ],
+    "capBand": "#0b121a"
+  },
+  "shape": {
+    "card": 26
+  },
+  "mark": "check",
+  "music": {
+    "transpose": 0,
+    "prog": [
+      "I",
+      "V",
+      "vi",
+      "IV"
+    ],
+    "bpm": 104,
+    "arp": [
+      0,
+      1,
+      2,
+      3,
+      2,
+      1,
+      2,
+      3,
+      0,
+      1,
+      2,
+      3,
+      2,
+      3,
+      1,
+      2
+    ]
+  }
+}

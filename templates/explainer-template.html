@@ -73,13 +73,34 @@
 'use strict';
 
 /* =====================================================================
-   PALETTE  (house tokens, keep them; only BRAND text changes per video)
-   bg page, s1 card, s2 row/inset, bd border, tx text, mu muted text,
-   gr success/live, am warning/hot, rd loss/error, bl primary/cursor accents,
-   off inactive dot, paper/ink light document pages, purple spare accent.
+   THEME  (look and sound; the motion language below never changes)
+   Swap it with `node $SK/apply-theme.mjs --theme <name> --html explainer.html` (themes/ in the skill),
+   or edit the literal by hand. Same THEME + same scenes = the same video, frame for frame.
+   colors    bg page, s1 card, s2 row/inset, bd border, tx text, mu muted, bl action (buttons, cursor burst, brand
+             word), gr done/live, am attention, rd loss/error only, off inactive dot, paper/ink light pages,
+             purple spare, light/core packet tail and core, spark alternate click spokes.
+   gradients bgGlow 3 stops (centre, 60%, edge), dots colour, logo 2 stops, bar 2 stops, hot 2 stops, capBand bottom.
+   font      CSS font stack. The first font must exist on the machine that renders; textW measures the real one.
+   shape     card corner radius.    mark  logo mark: check | ring | bolt | play | wave | square.
+   music     transpose (semitones from D major), prog (order of I V vi IV), bpm target, arp (16 steps of 0..3).
+   Keep gr, am and rd recognisable as green, amber and red in every theme: they carry meaning.
    ===================================================================== */
-const C = { bg:'#0f1720', s1:'#141d27', s2:'#1b2733', bd:'#2a3a4b', tx:'#e6edf3', mu:'#a0b1c5',
-  gr:'#2fca73', am:'#f59e0b', rd:'#ef4444', bl:'#3b82f6', off:'#3a4a5c', paper:'#f3f6fa', ink:'#1b2733', purple:'#a78bfa' };
+/* THEME START */
+const THEME = {"name": "house", "font": "'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif", "colors": {"bg": "#0f1720", "s1": "#141d27", "s2": "#1b2733", "bd": "#2a3a4b", "tx": "#e6edf3", "mu": "#a0b1c5", "gr": "#2fca73", "am": "#f59e0b", "rd": "#ef4444", "bl": "#3b82f6", "off": "#3a4a5c", "paper": "#f3f6fa", "ink": "#1b2733", "purple": "#a78bfa", "light": "#93c5fd", "core": "#dbeafe", "spark": "#ffd166"}, "gradients": {"bgGlow": ["#172638", "#111b26", "#0f1720"], "dots": "#22303f", "logo": ["#3b82f6", "#2fca73"], "bar": ["#2563eb", "#3b82f6"], "hot": ["#f59e0b", "#ef4444"], "capBand": "#0b121a"}, "shape": {"card": 26}, "mark": "check", "music": {"transpose": 0, "prog": ["I", "V", "vi", "IV"], "bpm": 104, "arp": [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 3, 1, 2]}};
+/* THEME END */
+const C = THEME.colors;
+(function applyTheme() {
+  const g = THEME.gradients, q = sel => document.querySelectorAll(sel);
+  document.documentElement.style.background = C.bg; document.body.style.background = C.bg;
+  document.getElementById('stage').setAttribute('font-family', THEME.font);
+  q('#bgGlow stop').forEach((el, i) => el.setAttribute('stop-color', g.bgGlow[i]));
+  q('#dots circle').forEach(el => el.setAttribute('fill', g.dots));
+  q('#logoG stop').forEach((el, i) => el.setAttribute('stop-color', g.logo[i]));
+  q('#hotG stop').forEach((el, i) => el.setAttribute('stop-color', g.hot[i]));
+  q('#blueBar stop').forEach((el, i) => el.setAttribute('stop-color', g.bar[i]));
+  q('#areaG stop').forEach(el => el.setAttribute('stop-color', C.gr));
+  q('#capBand stop').forEach((el, i) => el.setAttribute('stop-color', i ? g.capBand : C.bg));
+})();
 
 /* BRAND: placeholder product name. The second word is drawn in C.bl. Never use real client data. */
 const BRAND = { name: 'Acme', accent: 'Ops', tagline: 'Every workflow. One screen.' };
@@ -132,7 +153,7 @@ const bob = (t, k = 0, amp = 5, speed = 2) => Math.sin(t * speed + k) * amp;
                                      Size anything that follows text with it: strikes, underlines, highlight boxes,
                                      pills (chip(x, y, textW(label, 24) + 40, 40, label, ...)). Never guess a fixed width.
    ===================================================================== */
-const FONT = "'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+const FONT = THEME.font;
 const _tw = new Map(), _twCtx = document.createElement('canvas').getContext('2d');
 function textW(str, size, w = 600) {
   const k = `${w}|${size}|${str}`;
@@ -154,7 +175,7 @@ function R(x, y, w, h, r, fill, ex = '') {
   return `<rect x="${f(x)}" y="${f(y)}" width="${f(Math.max(0, w))}" height="${f(Math.max(0, h))}" rx="${r}" fill="${fill}" ${ex}/>`;
 }
 function Ci(cx, cy, r, fill, ex = '') { return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(Math.max(0, r))}" fill="${fill}" ${ex}/>`; }
-function card(x, y, w, h, ex = '') { return R(x, y, w, h, 26, C.s1, `stroke="${C.bd}" stroke-width="2" filter="url(#sh)" ${ex}`); }
+function card(x, y, w, h, ex = '') { return R(x, y, w, h, THEME.shape.card, C.s1, `stroke="${C.bd}" stroke-width="2" filter="url(#sh)" ${ex}`); }
 function check(cx, cy, s, color = '#fff', sw = 4) {
   return `<path d="M${f(cx - 8 * s)} ${f(cy + 0.5 * s)} L${f(cx - 2.5 * s)} ${f(cy + 6 * s)} L${f(cx + 8.5 * s)} ${f(cy - 6 * s)}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/>`;
 }
@@ -172,10 +193,19 @@ function lock(cx, cy, s, closeU) {
   return `<path d="M${f(cx - 9 * s)} ${f(cy - 2 * s - lift)} V${f(cy - 10 * s - lift)} A${f(9 * s)} ${f(9 * s)} 0 0 1 ${f(cx + 9 * s)} ${f(cy - 10 * s - lift)} V${f(cy - 2 * s - lift * 0.2)}" fill="none" stroke="${C.mu}" stroke-width="${f(4 * s)}" stroke-linecap="round"/>` +
     R(cx - 14 * s, cy - 3 * s, 28 * s, 22 * s, 6 * s, C.mu) + Ci(cx, cy + 7 * s, 3 * s, C.s1);
 }
+/* Logo marks: every mark is one stroked path with pathLength 1, so drawU draws it the same way. THEME.mark picks one. */
+const MARKS = {
+  check:  s => `M${f(32 * s)} ${f(42 * s)} L${f(58 * s)} ${f(84 * s)} L${f(90 * s)} ${f(32 * s)}`,
+  ring:   s => `M${f(60 * s)} ${f(28 * s)} A${f(32 * s)} ${f(32 * s)} 0 1 1 ${f(59.9 * s)} ${f(28 * s)}`,
+  bolt:   s => `M${f(66 * s)} ${f(26 * s)} L${f(44 * s)} ${f(64 * s)} L${f(62 * s)} ${f(64 * s)} L${f(54 * s)} ${f(94 * s)} L${f(78 * s)} ${f(54 * s)} L${f(60 * s)} ${f(54 * s)} Z`,
+  play:   s => `M${f(44 * s)} ${f(32 * s)} L${f(86 * s)} ${f(60 * s)} L${f(44 * s)} ${f(88 * s)} Z`,
+  wave:   s => `M${f(26 * s)} ${f(60 * s)} C${f(40 * s)} ${f(26 * s)} ${f(50 * s)} ${f(26 * s)} ${f(60 * s)} ${f(60 * s)} S${f(80 * s)} ${f(94 * s)} ${f(94 * s)} ${f(60 * s)}`,
+  square: s => `M${f(36 * s)} ${f(36 * s)} H${f(84 * s)} V${f(84 * s)} H${f(36 * s)} Z`,
+};
 function logo(size, drawU = 1) {
-  const s = size / 120;
+  const s = size / 120, d = (MARKS[THEME.mark] || MARKS.check)(s);
   return R(0, 0, size, size, 30 * s, 'url(#logoG)') +
-    `<path d="M${f(32 * s)} ${f(42 * s)} L${f(58 * s)} ${f(84 * s)} L${f(90 * s)} ${f(32 * s)}" fill="none" stroke="#fff" stroke-width="${f(13 * s)}" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${f(1 - drawU)}"/>`;
+    `<path d="${d}" fill="none" stroke="#fff" stroke-width="${f(13 * s)}" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${f(1 - drawU)}"/>`;
 }
 function wordmark(x, y, size, anchor = 'middle') {
   return `<text x="${f(x)}" y="${f(y)}" font-size="${size}" font-weight="700" text-anchor="${anchor}" fill="${C.tx}" letter-spacing="${f(-size * 0.01)}">${BRAND.name} <tspan fill="${C.bl}">${BRAND.accent}</tspan></text>`;
@@ -270,10 +300,10 @@ function packet(p0, p3, lt, t0, t1, o = {}) {
     const u = eio((lt - t0) / (t1 - t0));
     for (let k = 6; k >= 1; k--) {
       const [tx, ty] = bez(p0, p1, p2, p3, clamp(u - k * 0.025));
-      s += Ci(tx, ty, 11 * (1 - k / 7), '#93c5fd', `opacity="${f(0.6 * (1 - k / 7))}"`);
+      s += Ci(tx, ty, 11 * (1 - k / 7), C.light, `opacity="${f(0.6 * (1 - k / 7))}"`);
     }
     const [hx, hy] = bez(p0, p1, p2, p3, u);
-    s += Ci(hx, hy, 22, C.bl, 'filter="url(#glow)" opacity="0.9"') + Ci(hx, hy, 12, '#dbeafe');
+    s += Ci(hx, hy, 22, C.bl, 'filter="url(#glow)" opacity="0.9"') + Ci(hx, hy, 12, C.core);
   }
   return s + ring(p3[0], p3[1], lt, t1, C.gr, 10, 30, 0.5);
 }
@@ -340,7 +370,7 @@ function drawCursor(c) {
     s += Ci(bx, by, 8 + 46 * e, 'none', `stroke="${C.bl}" stroke-width="${f(5 * (1 - u) + 1)}" opacity="${f((1 - u) * 0.9 * op)}"`);
     for (let k = 0; k < 8; k++) {
       const a = k * Math.PI / 4 + Math.PI / 8, r1 = 20 + 34 * e, r2 = r1 + 18 * (1 - u) + 4;
-      s += `<line x1="${f(bx + Math.cos(a) * r1)}" y1="${f(by + Math.sin(a) * r1)}" x2="${f(bx + Math.cos(a) * r2)}" y2="${f(by + Math.sin(a) * r2)}" stroke="${k % 2 ? '#ffd166' : '#ffffff'}" stroke-width="5" stroke-linecap="round" opacity="${f((1 - u) * op)}"/>`;
+      s += `<line x1="${f(bx + Math.cos(a) * r1)}" y1="${f(by + Math.sin(a) * r1)}" x2="${f(bx + Math.cos(a) * r2)}" y2="${f(by + Math.sin(a) * r2)}" stroke="${k % 2 ? C.spark : '#ffffff'}" stroke-width="5" stroke-linecap="round" opacity="${f((1 - u) * op)}"/>`;
     }
   }
   let b = 0;

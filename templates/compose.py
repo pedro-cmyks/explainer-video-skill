@@ -54,7 +54,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 TARGET_MUSIC_LUFS = -18.0
 TP_CEILING_DB = -1.5          # limiter ceiling (true peak, 4x oversampled); AAC adds a little
-TARGET_BPM = 104.0
+TARGET_BPM = 104.0          # house default; parse_theme() overrides it from the HTML's THEME block
+TRANSPOSE = 0               # semitones from D major; parse_theme() overrides it
 
 
 # =====================================================================================
@@ -65,7 +66,7 @@ def db(x):
 
 
 def midi_hz(m):
-    return 440.0 * 2 ** ((m - 69) / 12)
+    return 440.0 * 2 ** ((m + TRANSPOSE - 69) / 12)
 
 
 def pan_gains(p):
@@ -446,6 +447,36 @@ def parse_timeline(html_path):
     if not scenes:
         raise SystemExit('could not find SCENES in ' + html_path)
     return total, scenes
+
+
+def parse_theme(html_path):
+    """Music settings from the HTML's THEME block (`const THEME = {...};` between THEME START and THEME END).
+    Sets TARGET_BPM, TRANSPOSE, PROG and ARP16 so the same theme always gives the same music.
+    Files without a THEME block (the reference, older videos) keep the house defaults."""
+    global TARGET_BPM, TRANSPOSE, PROG, ARP16
+    src = open(html_path, encoding='utf-8').read()
+    m = re.search(r"/\* THEME START \*/\s*const THEME\s*=\s*(\{.*?\});\s*/\* THEME END \*/", src, re.S)
+    if not m:
+        return None
+    try:
+        theme = json.loads(m.group(1))
+    except json.JSONDecodeError as e:
+        raise SystemExit(f'THEME block is not valid JSON (write it with apply-theme.mjs or as strict JSON): {e}')
+    mu = theme.get('music', {})
+    TARGET_BPM = float(mu.get('bpm', TARGET_BPM))
+    TRANSPOSE = int(mu.get('transpose', TRANSPOSE))
+    prog = mu.get('prog')
+    if prog:
+        bad = [x for x in prog if x not in CHORDS]
+        if bad:
+            raise SystemExit(f'THEME music.prog has unknown chords {bad}; use I, V, vi, IV')
+        PROG = list(prog)
+    arp = mu.get('arp')
+    if arp:
+        if len(arp) != 16 or any(int(x) not in (0, 1, 2, 3) for x in arp):
+            raise SystemExit('THEME music.arp needs 16 steps of 0..3')
+        ARP16 = [int(x) for x in arp]
+    return theme
 
 
 def parse_stats(html_path):
@@ -993,6 +1024,9 @@ def main():
         print('note: this is the skill copy of compose.py. Copy it into the work folder and edit local_events() there.')
 
     total, scenes = parse_timeline(args.html)
+    theme = parse_theme(args.html)
+    if theme:
+        print(f"theme {theme.get('name', '?')}: {TARGET_BPM:g} BPM target, transpose {TRANSPOSE:+d}, prog {' '.join(PROG)}")
     stats = parse_stats(args.html)
     n_total = int(round(total * SR))
     g = music_grid(total, scenes)

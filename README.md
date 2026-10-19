@@ -110,6 +110,23 @@ const SCENES = [
 
 The template ships the helper kit: easing, cards, chips, status dots, packets that fly between cards, charts that draw themselves, checkboxes, a progress ring and the cartoon cursor that glides, squashes and bursts on click. `reference/desk-crm-explainer.html` is a full 84.5 second video of a CRM shown with sample data only, and `reference/contact.png` is its frame grid. Most new scenes start by copying a pattern from it.
 
+## Themes
+
+One motion language, many looks. A theme is a small json in `themes/` with the palette tokens, the gradients, the font, the card radius, the logo mark and the music settings (key, chord order, tempo, arpeggio). The motion, the cursor, the captions and the checklist never change. Same theme, same scenes: the same video, frame for frame. Change the theme and the same scenes come out in another palette, another mark and another key.
+
+```bash
+node templates/apply-theme.mjs --list
+node templates/apply-theme.mjs --theme studio --html explainer.html
+```
+
+| Theme | Stage | Action colour | Logo mark | Font | Music |
+| --- | --- | --- | --- | --- | --- |
+| `house` | navy | blue | check | Avenir Next | D major, I V vi IV, 104 BPM |
+| `studio` | violet | violet | ring | Futura | A major, vi IV I V, 125 BPM |
+| `ember` | charcoal | orange | bolt | Georgia | F major, IV I V vi, 96 BPM |
+
+To make one, copy a json, change the values, keep `gr`, `am` and `rd` readable as green, amber and red (they carry meaning), use a font that exists on the machine that renders, and read the contact sheet for contrast. `compose.py` reads the music settings from the `THEME` block in the HTML, so the HTML is the single source of truth for a video.
+
 ## The audio pipeline
 
 `compose.py` reads `TOTAL`, `SCENES` and the outro stats straight from the HTML. Sound effects are written as offsets local to each scene, with the same numbers as the scene code, so moving a scene moves its sounds.
@@ -140,6 +157,8 @@ templates/
   render.mjs              HTML to MP4, poster, contact sheet and stills
   compose.py              music bed and synced effects, mastered and muxed
   voiceover.sh            optional macOS voiceover
+  apply-theme.mjs         stamps a theme from themes/ into a video's HTML
+themes/                   house, studio, ember: palette, font, mark and music per theme
 reference/
   desk-crm-explainer.html full reference video, fictional data
   contact.png             its contact sheet

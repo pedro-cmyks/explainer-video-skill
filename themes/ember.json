@@ -1,0 +1,76 @@
+{
+  "name": "ember",
+  "font": "'Georgia', 'Times New Roman', Times, serif",
+  "colors": {
+    "bg": "#141210",
+    "s1": "#1c1916",
+    "s2": "#28231e",
+    "bd": "#3f362d",
+    "tx": "#f5efe6",
+    "mu": "#bfae9a",
+    "gr": "#4ade80",
+    "am": "#fbbf24",
+    "rd": "#f87171",
+    "bl": "#fb923c",
+    "off": "#5a4d40",
+    "paper": "#faf5ec",
+    "ink": "#28231e",
+    "purple": "#c084fc",
+    "light": "#fed7aa",
+    "core": "#fff4e6",
+    "spark": "#fde68a"
+  },
+  "gradients": {
+    "bgGlow": [
+      "#2a2119",
+      "#1c1714",
+      "#141210"
+    ],
+    "dots": "#332b24",
+    "logo": [
+      "#fb923c",
+      "#f43f5e"
+    ],
+    "bar": [
+      "#ea580c",
+      "#fb923c"
+    ],
+    "hot": [
+      "#fbbf24",
+      "#f87171"
+    ],
+    "capBand": "#0f0d0b"
+  },
+  "shape": {
+    "card": 18
+  },
+  "mark": "bolt",
+  "music": {
+    "transpose": 3,
+    "prog": [
+      "IV",
+      "I",
+      "V",
+      "vi"
+    ],
+    "bpm": 96,
+    "arp": [
+      0,
+      3,
+      1,
+      2,
+      0,
+      3,
+      2,
+      1,
+      0,
+      3,
+      1,
+      2,
+      3,
+      0,
+      2,
+      1
+    ]
+  }
+}
