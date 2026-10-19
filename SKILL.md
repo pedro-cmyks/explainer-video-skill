@@ -36,6 +36,9 @@ Themes live in `themes/*.json` (`house`, `studio`, `ember`); `node $SK/apply-the
 the music settings from that same block. The brief names the theme; without one, use `house`. For a new theme, copy a
 json, change the tokens, keep `gr`, `am` and `rd` recognisable as green, amber and red, pick a font that exists on
 the machine that renders, and check the contact sheet for contrast before using it.
+Theme per scene (optional): paste more theme objects into `THEMES` and give a scene `theme: 'studio'`. Palette,
+gradients and card radius morph across the 1 s cross fade; font and logo mark switch on the boundary; the music stays
+the first theme's. Use it when the video is about variety itself; one theme is the normal case.
 
 Stage: 1920x1080 SVG, font `'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif` (theme `font`).
 

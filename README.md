@@ -127,6 +127,8 @@ node templates/apply-theme.mjs --theme studio --html explainer.html
 
 To make one, copy a json, change the values, keep `gr`, `am` and `rd` readable as green, amber and red (they carry meaning), use a font that exists on the machine that renders, and read the contact sheet for contrast. `compose.py` reads the music settings from the `THEME` block in the HTML, so the HTML is the single source of truth for a video.
 
+A video can also change theme as it plays: add more theme objects to `THEMES` in the HTML and give scenes a `theme` key. The palette morphs across the cross fade between scenes, the font and the mark switch on the boundary, and the music keeps the first theme's key.
+
 ## The audio pipeline
 
 `compose.py` reads `TOTAL`, `SCENES` and the outro stats straight from the HTML. Sound effects are written as offsets local to each scene, with the same numbers as the scene code, so moving a scene moves its sounds.

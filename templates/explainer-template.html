@@ -88,11 +88,30 @@
 /* THEME START */
 const THEME = {"name": "house", "font": "'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif", "colors": {"bg": "#0f1720", "s1": "#141d27", "s2": "#1b2733", "bd": "#2a3a4b", "tx": "#e6edf3", "mu": "#a0b1c5", "gr": "#2fca73", "am": "#f59e0b", "rd": "#ef4444", "bl": "#3b82f6", "off": "#3a4a5c", "paper": "#f3f6fa", "ink": "#1b2733", "purple": "#a78bfa", "light": "#93c5fd", "core": "#dbeafe", "spark": "#ffd166"}, "gradients": {"bgGlow": ["#172638", "#111b26", "#0f1720"], "dots": "#22303f", "logo": ["#3b82f6", "#2fca73"], "bar": ["#2563eb", "#3b82f6"], "hot": ["#f59e0b", "#ef4444"], "capBand": "#0b121a"}, "shape": {"card": 26}, "mark": "check", "music": {"transpose": 0, "prog": ["I", "V", "vi", "IV"], "bpm": 104, "arp": [0, 1, 2, 3, 2, 1, 2, 3, 0, 1, 2, 3, 2, 3, 1, 2]}};
 /* THEME END */
-const C = THEME.colors;
-(function applyTheme() {
-  const g = THEME.gradients, q = sel => document.querySelectorAll(sel);
+/* THEMES: every theme a video can use. One entry means one look. To change the look during the video, paste more
+   theme objects here (from themes/*.json) and give scenes a `theme: 'name'` key: the palette, gradients and card radius
+   morph over the 1 s cross fade, the font and the logo mark switch on the boundary. The first entry is THEME, and
+   compose.py takes the music from it (the music does not change mid video). */
+const THEMES = [THEME];
+const C = Object.assign({}, THEME.colors);   // live tokens: applyTheme() rewrites them every frame
+let ACTIVE = THEME;
+const _hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const lerpHex = (a, b, u) => u <= 0 ? a : u >= 1 ? b : '#' + _hex(a).map((v, i) => Math.round(v + (_hex(b)[i] - v) * u).toString(16).padStart(2, '0')).join('');
+function blendTheme(A, B, u) {
+  if (u <= 0 || A === B) return A;
+  if (u >= 1) return B;
+  const colors = {}; for (const k in A.colors) colors[k] = lerpHex(A.colors[k], B.colors[k], u);
+  const g = {}; for (const k in A.gradients) g[k] = Array.isArray(A.gradients[k]) ? A.gradients[k].map((c, i) => lerpHex(c, B.gradients[k][i], u)) : lerpHex(A.gradients[k], B.gradients[k], u);
+  const late = u >= 0.5 ? B : A;
+  return { name: `${A.name}>${B.name}`, font: late.font, colors, gradients: g, shape: { card: mix(A.shape.card, B.shape.card, u) }, mark: late.mark, music: A.music };
+}
+function applyTheme(th) {
+  if (th === ACTIVE) return;
+  ACTIVE = th;
+  Object.assign(C, th.colors);
+  const g = th.gradients, q = sel => document.querySelectorAll(sel);
   document.documentElement.style.background = C.bg; document.body.style.background = C.bg;
-  document.getElementById('stage').setAttribute('font-family', THEME.font);
+  document.getElementById('stage').setAttribute('font-family', th.font);
   q('#bgGlow stop').forEach((el, i) => el.setAttribute('stop-color', g.bgGlow[i]));
   q('#dots circle').forEach(el => el.setAttribute('fill', g.dots));
   q('#logoG stop').forEach((el, i) => el.setAttribute('stop-color', g.logo[i]));
@@ -100,7 +119,8 @@ const C = THEME.colors;
   q('#blueBar stop').forEach((el, i) => el.setAttribute('stop-color', g.bar[i]));
   q('#areaG stop').forEach(el => el.setAttribute('stop-color', C.gr));
   q('#capBand stop').forEach((el, i) => el.setAttribute('stop-color', i ? g.capBand : C.bg));
-})();
+}
+ACTIVE = null; applyTheme(THEME);
 
 /* BRAND: placeholder product name. The second word is drawn in C.bl. Never use real client data. */
 const BRAND = { name: 'Acme', accent: 'Ops', tagline: 'Every workflow. One screen.' };
@@ -153,11 +173,10 @@ const bob = (t, k = 0, amp = 5, speed = 2) => Math.sin(t * speed + k) * amp;
                                      Size anything that follows text with it: strikes, underlines, highlight boxes,
                                      pills (chip(x, y, textW(label, 24) + 40, 40, label, ...)). Never guess a fixed width.
    ===================================================================== */
-const FONT = THEME.font;
 const _tw = new Map(), _twCtx = document.createElement('canvas').getContext('2d');
 function textW(str, size, w = 600) {
-  const k = `${w}|${size}|${str}`;
-  if (!_tw.has(k)) { _twCtx.font = `${w} ${size}px ${FONT}`; _tw.set(k, _twCtx.measureText(String(str)).width); }
+  const k = `${ACTIVE.font}|${w}|${size}|${str}`;
+  if (!_tw.has(k)) { _twCtx.font = `${w} ${size}px ${ACTIVE.font}`; _tw.set(k, _twCtx.measureText(String(str)).width); }
   return _tw.get(k);
 }
 function T(x, y, s, size, fill, o = {}) {
@@ -175,7 +194,7 @@ function R(x, y, w, h, r, fill, ex = '') {
   return `<rect x="${f(x)}" y="${f(y)}" width="${f(Math.max(0, w))}" height="${f(Math.max(0, h))}" rx="${r}" fill="${fill}" ${ex}/>`;
 }
 function Ci(cx, cy, r, fill, ex = '') { return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(Math.max(0, r))}" fill="${fill}" ${ex}/>`; }
-function card(x, y, w, h, ex = '') { return R(x, y, w, h, THEME.shape.card, C.s1, `stroke="${C.bd}" stroke-width="2" filter="url(#sh)" ${ex}`); }
+function card(x, y, w, h, ex = '') { return R(x, y, w, h, f(ACTIVE.shape.card), C.s1, `stroke="${C.bd}" stroke-width="2" filter="url(#sh)" ${ex}`); }
 function check(cx, cy, s, color = '#fff', sw = 4) {
   return `<path d="M${f(cx - 8 * s)} ${f(cy + 0.5 * s)} L${f(cx - 2.5 * s)} ${f(cy + 6 * s)} L${f(cx + 8.5 * s)} ${f(cy - 6 * s)}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"/>`;
 }
@@ -203,7 +222,7 @@ const MARKS = {
   square: s => `M${f(36 * s)} ${f(36 * s)} H${f(84 * s)} V${f(84 * s)} H${f(36 * s)} Z`,
 };
 function logo(size, drawU = 1) {
-  const s = size / 120, d = (MARKS[THEME.mark] || MARKS.check)(s);
+  const s = size / 120, d = (MARKS[ACTIVE.mark] || MARKS.check)(s);
   return R(0, 0, size, size, 30 * s, 'url(#logoG)') +
     `<path d="${d}" fill="none" stroke="#fff" stroke-width="${f(13 * s)}" stroke-linecap="round" stroke-linejoin="round" pathLength="1" stroke-dasharray="1" stroke-dashoffset="${f(1 - drawU)}"/>`;
 }
@@ -536,8 +555,23 @@ const SCENES = [
    Transition: each scene fades out over its last 0.5 s and the next fades in over its first 0.5 s
    (a dip through the background, with a 0.985 -> 1 scale settle). The first scene starts solid,
    the last one ends with its own fade to C.bg. Brand bug shows from the 2nd scene to the outro. */
+/* themeAt(t): the scene's theme, blended with the next or previous one across the 1 s cross fade. Pure in t. */
+function themeAt(t) {
+  if (THEMES.length < 2) return THEME;
+  const byName = n => THEMES.find(x => x.name === n) || THEME;
+  for (let i = 0; i < SCENES.length; i++) {
+    const sc = SCENES[i], end = sc.start + sc.dur;
+    if (t < sc.start || t > end) continue;
+    const me = byName(sc.theme);
+    if (i + 1 < SCENES.length && t > end - 0.5) return blendTheme(me, byName(SCENES[i + 1].theme), lin(t, end - 0.5, end + 0.5));
+    if (i > 0 && t < sc.start + 0.5) return blendTheme(byName(SCENES[i - 1].theme), me, lin(t, sc.start - 0.5, sc.start + 0.5));
+    return me;
+  }
+  return THEME;
+}
 function render(t) {
   t = clamp(t, 0, TOTAL);
+  applyTheme(themeAt(t));
   let out = '', cur = null;
   const lastId = SCENES[SCENES.length - 1].id;
   for (const sc of SCENES) {
